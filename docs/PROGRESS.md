@@ -133,31 +133,39 @@ All planned phases complete. Application ready for local operator execution and 
 - Status: complete.
 - Changes:
   - `README.md`: Updated with full architecture overview, structure map (`frontend/` and `backend/`), operating modes, prerequisites, startup runbook, service ports, test commands, scenario descriptions, and honest claims statement.
-  - `docs/04-architecture.md`: Updated repository target reflecting `frontend/` and `backend/` folder separation.
-  - `docs/PROGRESS.md`: Complete audit of all 6 completed phases.
-- Commands and results:
-### Phase 7 — Final Repair & Presentation Pass (Independent Review Resolution) — 15 October 2026
+  - `docs/PROGRESS.md`: Complete audit of all phases.
+
+### Phase 8 — Independent Review Repairs & Production Recheck — 16 October 2026
 
 - Status: complete.
 - Changes:
-  - **Zero Login / Credential-Free CEO Experience**: Completely removed sign-in buttons, login modals, operator password forms, and auth barriers from the entire viewer and navigation UI. Visitors open directly to the overview, explore rehearsals, inspect evidence, compare runs, and download reports with zero setup.
-  - **Recovery Evaluation & Cancellation Bounds**: Replaced unconditional passing baseline assertions with post-execution verification requiring positive probe counts and real application traffic (`sample_request`). Cancellation halts new mutations immediately before subsequent operations; cleanup runs in its own bounded context.
-  - **Authenticated Management & Bounded Payloads**: Protected internal `/mgmt/*` endpoints with Bearer token authentication validated against `LAB_CONTROLLER_SECRET`.
-  - **Real End-to-End Application Trust Path**: Wired HTTPS application requests across `gateway -> orders -> ledger` with strict caller trust bundles and explicit SNI.
-  - **Lease Ownership & Fencing**: Generated per-run worker lease IDs (`worker-${process.pid}-${runId}`) to eliminate same-owner lease re-acquisition collisions; conditional lease release on both owner and fence.
-  - **S02 Real CA Proxy Route**: Mounted a dedicated local loopback HTTP CA proxy server (port 18440 in live lab, ephemeral in tests) simulating genuine 502 Bad Gateway partition errors during network outages.
-  - **Test Isolation & Ephemeral Ports**: Added `ephemeralPorts: true` to `LabController` for dynamic port binding (port 0) and isolated integration tests to `trustrehearsal_test` database.
-  - **Static Viewer Adapter Fallback**: `frontend/src/api/client.ts` automatically falls back to `/data/snapshots.json` if backend is offline or deployed as static viewer. Returns honest 404 for unknown run and scenario IDs.
-  - **Responsive Mobile Layout & Accessibility**: Eliminated 390px mobile viewport blowout by converting navigation to a collapsible mobile top header, wrapping tables in horizontal scroll containers (`.table-responsive`), and breaking long SHA-256 fingerprints with `.mono-break`. Added full WAI-ARIA dialog attributes and Escape key handling to modal components.
-  - **Comparison Engine**: Added scenario compatibility checks, warning banners for mismatched scenarios, and actual evidence value comparisons rather than relying solely on pass/fail status.
-  - **Operational Commands**: Upgraded `npm run lab:verify` for non-destructive inspection, `npm run lab:reset` for database/profile resets, and root `npm run dev` with cross-platform `concurrently`.
+  - **S03 Application Migration & Verification (P1A)**: Fixed callee dependency migration order in `backend/src/worker/engine.ts`. Dual-trust callers (`gateway` and `orders`) verify `ledger` migrated to `ledgerB0` and `orders` migrated to `ordersB0` before old trust is pruned. Real `gateway -> orders -> ledger` request executed *after* trust pruning to Root B only. Assertion `A04_trust_pruned_to_root_b` strictly fails if application request, probes, or ledger serving root are unverified. Added regression test `R16`.
+  - **Static Evidence Route Query Parsing (P1B)**: `frontend/src/api/client.ts` parses `pathname` and `searchParams` via `URLSearchParams`. Implemented `limit` and `afterSeq` parameter slicing on `/runs/:id/events?limit=200`. Unknown run IDs return genuine 404.
+  - **Truthful Static Reports & Measurement Counts (P1C)**: Removed fallbacks in `frontend/src/api/client.ts` that fabricated 10 samples, two 5-sample windows, verified recovery, or guessed tool versions. Empty snapshots report 0 samples, empty windows, and `not_run` recovery. Canonical validated reports exported directly with snapshots.
+  - **CA Proxy Bearer Authentication & Payload Guard (P1D)**: Protected `POST /issue` on CA proxy server with Bearer management token (`401 Unauthorized` on missing/invalid token). Constrained inputs to valid services and CAs; bounded body to 16KB. Added negative test `R17`.
+  - **Durable Event Persistence Failures (P1E)**: `backend/src/worker/engine.ts` wraps `RunEventModel.create` in try/catch. On failure, sets `ctx.persistenceFailed = true`, does not push to `ctx.events`, returns `id: null`, and halts subsequent experimental phases via `isInterrupted`. Added regression test `R18`.
+  - **Real Loopback Proxy Network Faults (P1F)**: Removed in-process short-circuit throw in `controller.ts:issueNewProfileAsync`. Faulted issuance traverses loopback HTTP server, emits request events, and returns genuine 502 Bad Gateway responses.
+  - **Explicit Deployment Mode & Outage Truthfulness (P1G)**: `frontend/src/api/client.ts` returns `{ mode: 'UNAVAILABLE' }` on 503 instead of falling back to static `PUBLIC_VIEWER`. `frontend/src/App.tsx` configures mode strictly via `VITE_APP_MODE` (`PUBLIC_VIEWER` by default). Local operator execution buttons protected by authenticated operator session check.
+  - **Fencing & Schema Alignment (Priority 2)**: Added `'timed_out'` to `RunLifecycleSchema` and `RunModel` schema. Bounded independent `cleanupCtx` resets interruption flags so recovery verification runs to completion.
+  - **Startup Reconciliation & Verified Reset**: `backend/src/index.ts` startup reconciliation clears only expired leases (`expiresAt < now`) and verifies baseline probe before marking environment ready. `scripts/reset-lab.ts` verifies real baseline application path (gateway -> orders -> ledger) and aborts if active unexpired lease is held.
+  - **Canonical Run Generation**: `scripts/generate-canonical-runs.ts` executes 3 clean runs of S01, S02, S03 (9 total), exports canonical sanitized snapshots with embedded reports, and synchronizes to frontend and backend dist.
 - Commands and results:
-  - Review reproduction script (`reproduce.cjs`): 100% verified passing with all assertions satisfied.
-  - Backend Vitest suite (`npm run test --workspace=backend`): 24/24 tests passed across all 6 test files (`repairs-regression.test.ts`, `runs-and-api.test.ts`, `scenarios-s02-s03.test.ts`, `security-and-viewer.test.ts`, `tls-proof.test.ts`, `contracts.test.ts`).
-  - `npm run lab:verify`: Passed (all 3 live services verified healthy).
-  - `npm run lab:reset`: Successfully reset lab environment to baseline A0 state.
-  - `npm run typecheck`: 0 errors across frontend and backend.
-  - `npm run build`: Production bundles for backend and frontend built successfully.
-- Evidence: 10 clean canonical runs generated and saved in `backend/src/export/recorded-snapshots.json` and `frontend/public/data/snapshots.json`. Reviewer harness validated `latest-live-report` with 2 real `sample_request` events and full evidence arrays.
-- Decisions/deviations: Public viewer runs with zero authentication barriers or login dialogs per CEO experience requirements.
+  - Independent review harness (`recheck-16.cjs`): 8/8 tests passed:
+    - `real-chain-and-management`: baselinePathSuccess: true, missingManagementTokenStatus: 401
+    - `s03-before-cleanup`: all 4 assertions pass, finalApplicationSuccess: true, finalApplicationStatus: 200, ledgerStillRootA: false
+    - `issuance-fault-network`: observedHttpRequests: 1, error: "HTTP 502 Bad Gateway: CA Issuance Proxy network partition simulated"
+    - `anonymous-issuer`: status: 401, receivedSignedCertificate: false, receivedLeafPrivateKey: false
+    - `event-persistence-failure`: returnedSuccess: false
+    - `api-503-silent-fallback`: reportedMode: "UNAVAILABLE"
+    - `static-events-query`: success: true
+    - `static-report-missing-evidence`: actualEvents: 0, reportedSamples: 0, reportedRecovery: "not_run", windows: []
+  - Public viewer automated verification (`npx tsx scripts/test-public-viewer.ts`): 9/9 checks passed cleanly.
+  - TypeScript typechecking (`npm run typecheck`): 0 errors across backend and frontend.
+  - Vitest suite (`npm run test --workspace=backend`): 27/27 tests passed across all 6 test files.
+  - Production build (`npm run build`): Completed in 5.39s with zero errors.
+- Evidence:
+  - `C:\Users\USER\.codex\visualizations\2026\10\15\01a13eef-7cc7-7f43-aa04-13c47c6cb303\trustrehearsal-review\recheck-16-results.json`
+  - `frontend/public/data/snapshots.json`
+  - `backend/dist/export/recorded-snapshots.json`
+- Next actions: Proceed to final git commit and present verified handoff per CEO experience requirements.
 

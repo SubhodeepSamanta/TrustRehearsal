@@ -1,121 +1,99 @@
-import dotenv from 'dotenv';
 import path from 'path';
 import fs from 'fs';
+import { connectDb } from '../backend/src/db/connection.js';
+import { RunModel, RunEventModel, LeaseModel, EnvironmentModel } from '../backend/src/db/models.js';
+import { LabController } from '../backend/src/lab/controller.js';
+import { RunExecutionEngine } from '../backend/src/worker/engine.js';
 import { exportSanitizedSnapshots } from '../backend/src/export/exportRuns.js';
 
-// Load root .env
-const rootEnv = path.resolve(__dirname, '../.env');
-if (fs.existsSync(rootEnv)) {
-  dotenv.config({ path: rootEnv });
-}
-
-const API_BASE = 'http://127.0.0.1:4000/api/v1';
-
 async function main() {
-  console.log('[CanonicalRuns] Authenticating with running backend...');
-  const operatorPassword = process.env.OPERATOR_PASSWORD || 'operator-rehearsal-2026';
+  console.log('[CanonicalRuns] Connecting to database...');
+  await connectDb();
 
-  const loginRes = await fetch(`${API_BASE}/operator/session`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ password: operatorPassword })
-  });
+  // Reset database state for clean canonical generation
+  console.log('[CanonicalRuns] Clearing existing runs and active leases...');
+  await RunModel.deleteMany({});
+  await RunEventModel.deleteMany({});
+  await LeaseModel.deleteMany({});
+  await EnvironmentModel.updateOne(
+    { id: 'sample-lab' },
+    { $set: { state: 'ready', activeRunId: null, lastVerifiedAt: new Date().toISOString() } }
+  );
 
-  if (!loginRes.ok) {
-    throw new Error(`Failed to authenticate operator: HTTP ${loginRes.status}`);
-  }
+  console.log('[CanonicalRuns] Initializing lab controller and execution engine...');
+  const controller = new LabController();
+  await controller.initialize();
+  const engine = new RunExecutionEngine(controller);
 
-  const setCookie = loginRes.headers.get('set-cookie');
-  const sessionData: any = await loginRes.json();
-  const csrfToken = sessionData.csrfToken;
-  console.log('[CanonicalRuns] Authenticated successfully as operator.');
-
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-    'X-CSRF-Token': csrfToken,
-    Cookie: setCookie ? setCookie.split(';')[0] : ''
-  };
-
-  const scenariosToRun = [
-    { id: 'S01', version: '1', count: 3 },
-    { id: 'S02', version: '1', count: 3 },
-    { id: 'S03', version: '1', count: 3 }
+  const scenarios: Array<{ id: 'S01' | 'S02' | 'S03'; count: number }> = [
+    { id: 'S01', count: 3 },
+    { id: 'S02', count: 3 },
+    { id: 'S03', count: 3 }
   ];
 
-  for (const { id, version, count } of scenariosToRun) {
-    for (let i = 1; i <= count; i++) {
-      console.log(`\n[CanonicalRuns] Triggering clean execution of ${id} (iteration ${i}/${count})...`);
+  try {
+    for (const { id, count } of scenarios) {
+      for (let i = 1; i <= count; i++) {
+        console.log(`\n[CanonicalRuns] Executing real lab run for ${id} (${i}/${count})...`);
 
-      const idempKey = `canonical-${id.toLowerCase()}-${i}-${Date.now()}`;
-      const startRes = await fetch(`${API_BASE}/runs`, {
-        method: 'POST',
-        headers: {
-          ...headers,
-          'Idempotency-Key': idempKey
-        },
-        body: JSON.stringify({
+        const fence = await engine.acquireLease('sample-lab', `canonical-worker-${process.pid}`);
+        if (!fence) {
+          throw new Error(`Failed to acquire lease for scenario ${id} iteration ${i}`);
+        }
+
+        const runId = `run-${id.toLowerCase()}-${i}-${Date.now().toString(36)}`;
+        const runDoc = await RunModel.create({
+          runId,
           environmentId: 'sample-lab',
+          environmentRevision: 'v1.0.0',
           scenarioId: id,
-          scenarioVersion: version
-        })
-      });
+          scenarioVersion: '1',
+          provenance: 'recorded_example',
+          lifecycle: 'queued',
+          active: true,
+          createdAt: new Date().toISOString(),
+          fencingToken: fence,
+          toolVersions: { node: process.version, platform: process.platform }
+        });
 
-      if (!startRes.ok) {
-        const err = await startRes.json().catch(() => ({}));
-        throw new Error(`Failed to start run for ${id}: HTTP ${startRes.status} - ${JSON.stringify(err)}`);
-      }
+        await engine.executeRun(runDoc, fence);
+        await engine.releaseLease('sample-lab', `canonical-worker-${process.pid}`, fence);
 
-      const { runId } = await startRes.json();
-      console.log(`[CanonicalRuns] Run started: ${runId}. Polling for completion...`);
+        const finished = await RunModel.findOne({ runId });
+        console.log(
+          `[CanonicalRuns] Run ${runId} completed: lifecycle=${finished?.lifecycle}, outcome=${finished?.outcome}, assertions=${finished?.assertionResults?.length}`
+        );
 
-      // Poll until completed
-      let finished = false;
-      let attempts = 0;
-      while (!finished && attempts < 80) {
-        await new Promise((r) => setTimeout(r, 1000));
-        attempts++;
-
-        const runRes = await fetch(`${API_BASE}/runs/${runId}`);
-        if (!runRes.ok) continue;
-
-        const runData = await runRes.json();
-        if (!runData.active) {
-          finished = true;
-          console.log(`[CanonicalRuns] Run ${runId} finished with lifecycle=${runData.lifecycle}, outcome=${runData.outcome}`);
-          if (runData.outcome !== 'pass') {
-            console.warn(`[CanonicalRuns] Warning: Run ${runId} finished with outcome ${runData.outcome}`);
-          }
-          break;
+        if (finished?.outcome !== 'pass') {
+          console.warn(`[CanonicalRuns] Warning: ${runId} finished with outcome=${finished?.outcome}`);
         }
       }
-
-      if (!finished) {
-        throw new Error(`Run ${runId} timed out after 80s`);
-      }
-
-      // Small cooldown between runs to ensure clean transition
-      await new Promise((r) => setTimeout(r, 500));
     }
+
+    console.log('\n[CanonicalRuns] All 9 canonical runs executed. Exporting sanitized snapshots...');
+    await exportSanitizedSnapshots();
+
+    // Also copy to backend/dist/export/recorded-snapshots.json if dist exists
+    const backendDistExport = path.resolve(__dirname, '../backend/dist/export');
+    if (fs.existsSync(backendDistExport)) {
+      fs.copyFileSync(
+        path.resolve(__dirname, '../backend/src/export/recorded-snapshots.json'),
+        path.join(backendDistExport, 'recorded-snapshots.json')
+      );
+      console.log('[CanonicalRuns] Synchronized snapshots to backend/dist/export/recorded-snapshots.json');
+    }
+
+    console.log('[CanonicalRuns] Canonical runs generation completed successfully.');
+  } finally {
+    await controller.stop();
+    const mongoose = (await import('mongoose')).default;
+    await mongoose.disconnect();
   }
 
-  console.log('\n[CanonicalRuns] All 9 canonical runs executed cleanly. Exporting sanitized snapshots...');
-  await exportSanitizedSnapshots();
-
-  // Also ensure backend/dist/export/recorded-snapshots.json is updated
-  const backendDistExport = path.resolve(__dirname, '../backend/dist/export');
-  if (fs.existsSync(backendDistExport)) {
-    fs.copyFileSync(
-      path.resolve(__dirname, '../backend/src/export/recorded-snapshots.json'),
-      path.join(backendDistExport, 'recorded-snapshots.json')
-    );
-    console.log('[CanonicalRuns] Copied updated snapshots to backend/dist/export/recorded-snapshots.json');
-  }
-
-  console.log('[CanonicalRuns] Canonical runs generation completed successfully.');
   process.exit(0);
 }
 
 main().catch((err) => {
-  console.error('[CanonicalRuns] Error:', err);
+  console.error('[CanonicalRuns] Fatal error:', err);
   process.exit(1);
 });
