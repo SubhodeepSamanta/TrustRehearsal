@@ -4,11 +4,11 @@ Last updated: 15 October 2026.
 
 ## Current state
 
-Phase 0 and Phase 1 complete. Real TLS proof verified: Root CAs A and B, live HTTPS sample services (`gateway`, `orders`, `ledger`), strict fresh TLS probes, atomic profile installation without reload (mismatch detected), context reload on running HTTPS server, and clean baseline reset.
+Phase 0, 1, and 2 complete. MongoDB models, atomic leasing/fencing, worker execution state machine, event persistence, S01 execution, SSE stream, and validated report exports verified and passing.
 
 ## Active phase
 
-Next: Phase 2 in 09-build-plan.md (Durable run backend: Mongo models, leases/fence, worker state machine, S01 execution, SSE stream, reports).
+Next: Phase 3 in 09-build-plan.md (Product interface: tokens, shell, Overview, scenario detail, Run detail/evidence, Environment, Runs, and Report).
 
 ## Completed
 
@@ -60,5 +60,19 @@ Next: Phase 2 in 09-build-plan.md (Durable run backend: Mongo models, leases/fen
   - `npm run test --workspace=backend`: 5/5 passed (contracts and tls-proof).
 - Evidence: `backend/tests/tls-proof.test.ts` real handshakes on ports 8443, 8444, 8445; observed distinct SHA-256 leaf fingerprints and verified reload without process restart.
 - Decisions/deviations: None.
-- Remaining limitations: Durable run persistence (MongoDB) and worker executor to be built in Phase 2.
-- Next action: Implement Phase 2 MongoDB models, atomic leases/fencing, worker state machine, S01 execution, SSE stream, and API routes.
+### Phase 2 — Durable run backend — 15 October 2026
+
+- Status: complete.
+- Changes:
+  - `backend/src/db/models.ts`: Mongoose models for Environment, Scenario, Run, RunEvent, Lease, Session, and Idempotency with unique and partial indexes.
+  - `backend/src/db/connection.ts`: MongoDB connection and idempotently seeds `sample-lab` and S01, S02, S03 scenario specs.
+  - `backend/src/worker/engine.ts`: Worker state machine (`queued` -> `running` -> `recovering` -> `completed`), atomic lease acquisition with monotonic fencing token, 5s heartbeat, real execution of S01, S02, and S03, event emission, SSE fan-out, and assertion evaluation.
+  - `backend/src/api/routes.ts`: Full REST API with session management, CSRF validation, deployment mode enforcement, run creation with idempotency key, cancel, reset, SSE streaming, and canonical JSON report export.
+  - `backend/tests/integration/runs-and-api.test.ts`: Integration test verifying S01 execution, event streaming/persistence, report contract validation, and concurrent lease rejection.
+- Commands and results:
+  - `npm run test:integration --workspace=backend`: 2/2 passed.
+  - `npm run test --workspace=backend`: 7/7 passed.
+- Evidence: Durable run record `test-run-s01-...` executed, emitted >10 events, all 6 assertions passed with real event references, and report validated against `ReportSchema`.
+- Decisions/deviations: None.
+- Remaining limitations: Frontend screens to be built in Phase 3.
+- Next action: Implement Phase 3 Product Interface: responsive React application with overview, environment topology diagram, rehearsal runner, timeline, assertions, evidence explorer, and printable report.

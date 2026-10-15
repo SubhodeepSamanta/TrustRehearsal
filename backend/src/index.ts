@@ -1,8 +1,12 @@
-import express, { Request, Response } from 'express';
+import express from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import dotenv from 'dotenv';
 import { DeploymentModeSchema } from './contracts/index.js';
+import { connectDb, seedEnvironmentAndScenarios } from './db/connection.js';
+import { LabController } from './lab/controller.js';
+import { RunExecutionEngine } from './worker/engine.js';
+import { createApiRouter } from './api/routes.js';
 
 dotenv.config();
 
@@ -18,33 +22,35 @@ app.use(cors({
 app.use(cookieParser());
 app.use(express.json({ limit: '32kb' }));
 
-// Liveness
-app.get('/api/v1/health', (_req: Request, res: Response) => {
-  res.json({
-    status: 'ok',
-    mode,
-    timestamp: new Date().toISOString()
-  });
-});
+let controller: LabController;
+let engine: RunExecutionEngine;
 
-// Meta
-app.get('/api/v1/meta', (_req: Request, res: Response) => {
-  res.json({
-    mode,
-    capabilities: {
-      liveExecution: mode === 'LOCAL_OPERATOR',
-      exportReport: true,
-      scenarios: ['S01', 'S02', 'S03']
-    },
-    buildVersion: '1.0.0',
-    fixtureProvenance: mode === 'PUBLIC_VIEWER' ? 'recorded_example' : 'live_lab'
-  });
-});
+export async function bootstrapApp(): Promise<express.Application> {
+  await connectDb();
+  await seedEnvironmentAndScenarios();
+
+  controller = new LabController();
+  await controller.initialize();
+
+  engine = new RunExecutionEngine(controller);
+
+  const apiRouter = createApiRouter(mode, engine, controller);
+  app.use('/api/v1', apiRouter);
+
+  return app;
+}
 
 export { app, port, host, mode };
 
 if (process.env.NODE_ENV !== 'test') {
-  app.listen(port, host, () => {
-    console.log(`[TrustRehearsal API] Running in ${mode} mode at http://${host}:${port}`);
-  });
+  bootstrapApp()
+    .then(() => {
+      app.listen(port, host, () => {
+        console.log(`[TrustRehearsal API] Running in ${mode} mode at http://${host}:${port}`);
+      });
+    })
+    .catch((err) => {
+      console.error('[TrustRehearsal API] Failed to start:', err);
+      process.exit(1);
+    });
 }
