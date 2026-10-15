@@ -10,7 +10,8 @@ import {
   Copy,
   Check,
   ChevronDown,
-  ChevronRight
+  ChevronRight,
+  Download
 } from 'lucide-react';
 
 interface RunDetailPageProps {
@@ -58,6 +59,22 @@ export default function RunDetailPage({ isOperator }: RunDetailPageProps) {
     navigator.clipboard.writeText(text);
     setCopiedId(id);
     setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  const downloadEvidenceJson = () => {
+    if (!run) return;
+    const exportData = {
+      run,
+      events: eventsData || [],
+      exportedAt: new Date().toISOString()
+    };
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `trustrehearsal-${run.id}-evidence.json`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   const filteredEvents = useMemo(() => {
@@ -140,6 +157,27 @@ export default function RunDetailPage({ isOperator }: RunDetailPageProps) {
             </button>
           )}
 
+          <button
+            onClick={downloadEvidenceJson}
+            title="Download full execution trace as formatted JSON"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              background: 'var(--surface-muted)',
+              border: '1px solid var(--line)',
+              color: 'var(--ink)',
+              padding: '8px 14px',
+              borderRadius: 'var(--radius-sm)',
+              fontWeight: 600,
+              fontSize: 13,
+              cursor: 'pointer'
+            }}
+          >
+            <Download size={15} />
+            Raw Evidence (.json)
+          </button>
+
           <Link
             to={`/runs/${run.id}/report`}
             style={{
@@ -172,17 +210,45 @@ export default function RunDetailPage({ isOperator }: RunDetailPageProps) {
           borderRadius: 'var(--radius-md)',
           padding: 24
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
             <h3 style={{ fontSize: 16, fontWeight: 600, color: 'var(--ink)' }}>
               Execution Timeline & Observations
             </h3>
             <span style={{ fontSize: 12, color: 'var(--ink-muted)' }}>
-              {eventsData?.length || 0} Persisted Events
+              Showing {filteredEvents.length} of {eventsData?.length || 0} Events
             </span>
           </div>
 
+          <div style={{ display: 'flex', gap: 6, marginBottom: 16, flexWrap: 'wrap' }}>
+            {[
+              { id: 'all', label: 'All Events' },
+              { id: 'tls_probe', label: 'TLS Probes' },
+              { id: 'step_start', label: 'Phase Steps' },
+              { id: 'fault_injected', label: 'Faults' },
+              { id: 'assertion', label: 'Assertions' }
+            ].map((f) => (
+              <button
+                key={f.id}
+                onClick={() => setFilterType(f.id)}
+                style={{
+                  padding: '4px 10px',
+                  borderRadius: 14,
+                  fontSize: 12,
+                  fontWeight: 500,
+                  border: '1px solid',
+                  borderColor: filterType === f.id ? 'var(--accent)' : 'var(--line)',
+                  background: filterType === f.id ? 'var(--accent-soft)' : 'var(--surface)',
+                  color: filterType === f.id ? 'var(--accent)' : 'var(--ink-secondary)',
+                  cursor: 'pointer'
+                }}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {(eventsData || []).map((evt) => {
+            {filteredEvents.map((evt) => {
               const isExpanded = expandedEventId === evt.id;
               const isProbe = evt.type === 'tls_probe';
               const isMismatch = evt.data?.mismatchDetected;

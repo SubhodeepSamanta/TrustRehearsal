@@ -1,12 +1,14 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { apiFetch } from '../api/client.js';
 import StatusChip from '../components/StatusChip.js';
-import { FileText, ArrowRight } from 'lucide-react';
+import { FileText, ArrowRight, Search, X } from 'lucide-react';
 
 export default function RunsPage() {
   const [selectedForCompare, setSelectedForCompare] = useState<string[]>([]);
+  const [scenarioFilter, setScenarioFilter] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState<string>('');
 
   const { data: runsData, isLoading } = useQuery({
     queryKey: ['runs', 50],
@@ -25,6 +27,24 @@ export default function RunsPage() {
       return [...prev, runId];
     });
   };
+
+  const filteredRuns = useMemo(() => {
+    return (runsData?.runs || []).filter((run) => {
+      if (scenarioFilter !== 'all' && run.scenarioId !== scenarioFilter) {
+        return false;
+      }
+      if (searchQuery.trim()) {
+        const query = searchQuery.toLowerCase().trim();
+        const matchesId = run.id?.toLowerCase().includes(query);
+        const matchesScenario = run.scenarioId?.toLowerCase().includes(query);
+        const matchesOutcome = run.outcome?.toLowerCase().includes(query);
+        if (!matchesId && !matchesScenario && !matchesOutcome) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }, [runsData?.runs, scenarioFilter, searchQuery]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
@@ -63,10 +83,84 @@ export default function RunsPage() {
         background: 'var(--surface)',
         border: '1px solid var(--line)',
         borderRadius: 'var(--radius-md)',
+        padding: '16px 20px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        flexWrap: 'wrap',
+        gap: 16
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-muted)', textTransform: 'uppercase' }}>
+            Filter:
+          </span>
+          {[
+            { id: 'all', label: 'All Scenarios' },
+            { id: 'S01', label: 'S01: Reload' },
+            { id: 'S02', label: 'S02: CA Proxy' },
+            { id: 'S03', label: 'S03: Root Rollover' }
+          ].map((f) => (
+            <button
+              key={f.id}
+              onClick={() => setScenarioFilter(f.id)}
+              style={{
+                padding: '4px 10px',
+                borderRadius: 14,
+                fontSize: 12,
+                fontWeight: 500,
+                border: '1px solid',
+                borderColor: scenarioFilter === f.id ? 'var(--accent)' : 'var(--line)',
+                background: scenarioFilter === f.id ? 'var(--accent-soft)' : 'var(--surface-muted)',
+                color: scenarioFilter === f.id ? 'var(--accent)' : 'var(--ink-secondary)',
+                cursor: 'pointer'
+              }}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+
+        <div style={{ position: 'relative', minWidth: 240 }}>
+          <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--ink-muted)' }} />
+          <input
+            type="text"
+            placeholder="Search Run ID or outcome..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            style={{
+              width: '100%',
+              background: 'var(--surface-muted)',
+              border: '1px solid var(--line)',
+              borderRadius: 'var(--radius-sm)',
+              padding: '6px 12px 6px 30px',
+              fontSize: 12,
+              color: 'var(--ink)',
+              fontFamily: 'inherit'
+            }}
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery('')}
+              style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'transparent', border: 'none', color: 'var(--ink-muted)', cursor: 'pointer' }}
+            >
+              <X size={12} />
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div style={{
+        background: 'var(--surface)',
+        border: '1px solid var(--line)',
+        borderRadius: 'var(--radius-md)',
         overflow: 'hidden'
       }}>
         {isLoading ? (
           <div style={{ padding: 40, textAlign: 'center', color: 'var(--ink-muted)' }}>Loading runs...</div>
+        ) : filteredRuns.length === 0 ? (
+          <div style={{ padding: 40, textAlign: 'center', color: 'var(--ink-muted)' }}>
+            No rehearsal runs matched the selected filter or search criteria.
+          </div>
         ) : (
           <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: 13 }}>
             <thead>
@@ -83,7 +177,7 @@ export default function RunsPage() {
               </tr>
             </thead>
             <tbody>
-              {(runsData?.runs || []).map((run) => {
+              {filteredRuns.map((run) => {
                 const isSelected = selectedForCompare.includes(run.id);
                 return (
                   <tr key={run.id} style={{ borderBottom: '1px solid var(--line)', background: isSelected ? 'var(--accent-soft)' : 'transparent' }}>

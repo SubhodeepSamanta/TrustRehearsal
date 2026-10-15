@@ -1,4 +1,6 @@
 import { NavLink } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import { apiFetch } from '../api/client.js';
 import {
   LayoutDashboard,
   Network,
@@ -19,6 +21,15 @@ interface NavigationProps {
 }
 
 export default function Navigation({ mode, isOperator, onLogout, onOpenLogin }: NavigationProps) {
+  const { data: healthData, isError } = useQuery({
+    queryKey: ['health-check'],
+    queryFn: () => apiFetch<{ status: string; mode: string }>('/health'),
+    refetchInterval: 12000,
+    retry: 1
+  });
+
+  const isOnline = !isError && healthData?.status === 'ok';
+
   const navItems = [
     { to: '/', label: 'Overview', icon: LayoutDashboard },
     { to: '/environment', label: 'Environment', icon: Network },
@@ -153,6 +164,29 @@ export default function Navigation({ mode, isOperator, onLogout, onOpenLogin }: 
             Read-only preview
           </div>
         )}
+
+        <div style={{
+          marginTop: 14,
+          paddingTop: 12,
+          borderTop: '1px solid var(--line)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+          fontSize: 11,
+          color: 'var(--ink-secondary)',
+          paddingLeft: 8
+        }}>
+          <span style={{
+            width: 7,
+            height: 7,
+            borderRadius: '50%',
+            background: isOnline ? 'var(--success)' : 'var(--danger)',
+            boxShadow: isOnline ? '0 0 6px var(--success)' : 'none'
+          }} />
+          <span style={{ fontWeight: 500 }}>
+            {isOnline ? 'Rehearsal API Online' : 'API Offline'}
+          </span>
+        </div>
       </div>
     </aside>
   );
