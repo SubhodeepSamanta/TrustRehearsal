@@ -4,11 +4,11 @@ Last updated: 15 October 2026.
 
 ## Current state
 
-Workspace initialized with `frontend/` (React, Vite, TypeScript) and `backend/` (Express API, worker, lab controller, Zod contracts). Git repository initialized. Tool prerequisites verified (Node v22.16.0, npm 11.17.0, Docker 29.2.1, MongoDB running locally). Contracts and schemas pass schema validation against planning example.
+Phase 0 and Phase 1 complete. Real TLS proof verified: Root CAs A and B, live HTTPS sample services (`gateway`, `orders`, `ledger`), strict fresh TLS probes, atomic profile installation without reload (mismatch detected), context reload on running HTTPS server, and clean baseline reset.
 
 ## Active phase
 
-Next: Phase 1 in 09-build-plan.md (Real TLS proof, before dashboard).
+Next: Phase 2 in 09-build-plan.md (Durable run backend: Mongo models, leases/fence, worker state machine, S01 execution, SSE stream, reports).
 
 ## Completed
 
@@ -47,4 +47,18 @@ Next: Phase 1 in 09-build-plan.md (Real TLS proof, before dashboard).
 - Evidence: `backend/tests/contracts.test.ts` passing report schema validation against `docs/examples/report.example.json`.
 - Decisions/deviations: Implemented strict folder layout with `frontend` and `backend` folders per user explicit request.
 - Remaining limitations: Lab CAs and sample HTTPS services not yet booted (Phase 1).
-- Next action: Implement Phase 1: Lab CA generation, HTTPS sample services, strict TLS probe, and S01 issuance/install/served mismatch/reload proof.
+### Phase 1 — Real TLS proof, before dashboard — 15 October 2026
+
+- Status: complete.
+- Changes:
+  - `backend/src/lab/ca.ts`: PKI manager generating Root CAs A and B, leaf certificates with SANs (`orders`, `ledger`, `gateway`, `localhost`, `127.0.0.1`), SHA-256 fingerprint extraction.
+  - `backend/src/lab/sampleServices.ts`: Live HTTPS sample services with atomic profile install and live context reload (`server.setSecureContext`).
+  - `backend/src/lab/probe.ts`: Fresh-connection TLS probe with explicit SNI, chain validation, timing and peer certificate fingerprint extraction.
+  - `backend/src/lab/controller.ts`: Controller managing CAs, baseline profiles A0/B0, context reload, trust updates, proxy fault injection, and baseline reset.
+  - `backend/tests/tls-proof.test.ts`: Integration test verifying A0 served -> A1 issued & installed without reload (mismatch detected) -> context reloaded -> A1 served -> reset to A0 -> negative control with untrusted CA rejected.
+- Commands and results:
+  - `npm run test --workspace=backend`: 5/5 passed (contracts and tls-proof).
+- Evidence: `backend/tests/tls-proof.test.ts` real handshakes on ports 8443, 8444, 8445; observed distinct SHA-256 leaf fingerprints and verified reload without process restart.
+- Decisions/deviations: None.
+- Remaining limitations: Durable run persistence (MongoDB) and worker executor to be built in Phase 2.
+- Next action: Implement Phase 2 MongoDB models, atomic leases/fencing, worker state machine, S01 execution, SSE stream, and API routes.
