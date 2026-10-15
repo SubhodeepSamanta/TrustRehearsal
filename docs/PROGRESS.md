@@ -221,3 +221,11 @@ Final targeted repairs verified for the recorded public viewer. Preserve all exi
   - Confirmed Table of Contents internal links jump to exact destination sections.
   - Verified 27/27 Vitest backend test results and 117-assertion external review harness claims are accurately described.
   - Confirmed honest claims: server-authenticated TLS only, S02 proxy 502 fault scope, zero credentials in public viewer, and remaining production hardening boundaries.
+
+### Render Deployment Configuration & Static Asset Hardening — 16 October 2026
+
+- Hardened backend host binding: defaults to `0.0.0.0` when `NODE_ENV=production` or `HOST` is configured to prevent loopback-only bind failures on Render.
+- Added Express fallback static asset serving: Express automatically serves the built React bundle from `frontend/dist` when available, enabling single-service hosting on Render.
+- Added root `start` script (`node backend/dist/index.js`) to `package.json` for seamless Render zero-config start commands.
+- Verified MongoDB connection semantics: checked Atlas SRV query requirement and highlighted `0.0.0.0/0` IP Access List prerequisite for dynamic cloud outbound IPs.
+- Committed and pushed to `main` branch on GitHub repository.
