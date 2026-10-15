@@ -1,3 +1,4 @@
+import { ReportSchema } from '../../../backend/src/contracts/index';
 import { useEffect, useState, useRef } from 'react';
 
 const API_BASE = ((import.meta as any).env?.VITE_API_URL || '') + '/api/v1';
@@ -15,16 +16,23 @@ export function getCsrfToken(): string | null {
 
 async function loadStaticSnapshots(): Promise<any[]> {
   if (cachedSnapshots) return cachedSnapshots;
-  try {
-    const res = await fetch('/data/snapshots.json');
-    if (res.ok) {
-      cachedSnapshots = await res.json();
-      return cachedSnapshots || [];
+  const res = await fetch('/data/snapshots.json');
+  if (!res.ok) throw new Error('Recorded evidence is unavailable. HTTP ' + res.status);
+  const payload: unknown = await res.json();
+  if (!Array.isArray(payload)) throw new Error('Invalid recorded evidence format.');
+  for (const snapshot of payload) {
+    if (!snapshot || typeof snapshot.id !== 'string' || !Array.isArray(snapshot.events)) {
+      throw new Error('Invalid recorded run.');
     }
-  } catch {
-    // fallback empty
+    if (snapshot.report) {
+      const report = ReportSchema.parse(snapshot.report);
+      if (report.run.id !== snapshot.id || report.run.provenance !== 'recorded_example') {
+        throw new Error('Recorded report identity or provenance mismatch.');
+      }
+    }
   }
-  return [];
+  cachedSnapshots = payload;
+  return payload;
 }
 
 const STATIC_SCENARIOS: Record<string, any> = {
@@ -144,17 +152,15 @@ async function handleStaticFallback<T>(path: string): Promise<T> {
   }
 
   if (pathname === '/environments' || pathname === '/environments/sample-lab') {
+    const recorded = snapshots[0]?.report?.environmentSnapshot;
     const env = {
       id: 'sample-lab',
-      revision: 'v1.0.0',
-      label: 'Recorded Lab Topology (gateway -> orders -> ledger)',
+      revision: snapshots[0]?.environmentRevision || 'unknown',
+      label: recorded?.label || 'Recorded lab topology',
       baselineProfile: 'A0',
       state: 'ready',
-      services: [
-        { id: 'gateway', name: 'gateway', role: 'caller', port: 8443, configuredIssuer: 'issuer-a', installedProfile: 'A0', status: 'healthy' },
-        { id: 'orders', name: 'orders', role: 'service', port: 8444, configuredIssuer: 'issuer-a', installedProfile: 'A0', status: 'healthy' },
-        { id: 'ledger', name: 'ledger', role: 'service', port: 8445, configuredIssuer: 'issuer-a', installedProfile: 'A0', status: 'healthy' }
-      ]
+      services: (recorded?.services || []).map((service: any) => ({ ...service, name: service.name || service.id })),
+      edges: (recorded?.edges || []).map((edge: any) => ({ ...edge, servername: edge.servername || edge.callee, expectedTrustProfile: edge.expectedTrustProfile || 'Recorded configuration' }))
     };
     return (pathname === '/environments' ? [env] : env) as unknown as T;
   }
@@ -184,7 +190,10 @@ async function handleStaticFallback<T>(path: string): Promise<T> {
         createdAt: r.createdAt,
         startedAt: r.startedAt,
         finishedAt: r.finishedAt,
-        assertionsSummary: r.assertionsSummary
+        assertionsSummary: r.assertionsSummary || {
+          total: (r.assertionResults || []).length,
+          passed: (r.assertionResults || []).filter((assertion: any) => assertion.status === 'pass').length
+        }
       })),
       nextCursor: null
     } as unknown as T;
@@ -225,7 +234,7 @@ async function handleStaticFallback<T>(path: string): Promise<T> {
 
     if (sub === 'report') {
       if (run.report) {
-        return run.report as unknown as T;
+        return ReportSchema.parse(run.report) as unknown as T;
       }
       const probeEvents = (run.events || []).filter((e: any) => e.type === 'tls_probe');
       const sampleCount = run.methodology?.sampleCount !== undefined
@@ -234,8 +243,7 @@ async function handleStaticFallback<T>(path: string): Promise<T> {
       const windows = run.methodology?.windows || [];
       const recovery = run.recoveryResult || {
         status: 'not_run',
-        evidenceEventIds: [],
-        completedAt: null
+        evidenceEventIds: []
       };
 
       const report = {
@@ -252,7 +260,7 @@ async function handleStaticFallback<T>(path: string): Promise<T> {
           environmentId: run.environmentId,
           environmentRevision: run.environmentRevision || 'v1.0.0',
           buildCommit: run.buildCommit || null,
-          toolVersions: run.toolVersions || null
+          toolVersions: run.toolVersions || {}
         },
         environmentSnapshot: run.environmentSnapshot || {
           label: 'Recorded Lab Topology (gateway -> orders -> ledger)',
@@ -282,7 +290,7 @@ async function handleStaticFallback<T>(path: string): Promise<T> {
         evidenceEvents: run.events || [],
         limitations: run.limitations || []
       };
-      return report as unknown as T;
+      return ReportSchema.parse(report) as unknown as T;
     }
   }
 
@@ -290,8 +298,14 @@ async function handleStaticFallback<T>(path: string): Promise<T> {
 }
 
 export async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const configuredMode = (import.meta as any).env?.VITE_APP_MODE;
+  const configuredMode = (import.meta as any).env?.VITE_APP_MODE || 'PUBLIC_VIEWER';
+  if (!['PUBLIC_VIEWER', 'LOCAL_OPERATOR'].includes(configuredMode)) {
+    throw new Error('Invalid VITE_APP_MODE configuration.');
+  }
   if (configuredMode === 'PUBLIC_VIEWER') {
+    if ((options.method || 'GET').toUpperCase() !== 'GET') {
+      throw new Error('Live operations are disabled in the recorded viewer.');
+    }
     return handleStaticFallback<T>(path);
   }
 
@@ -343,14 +357,7 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
 
     return await res.json();
   } catch (err: any) {
-    if (err.message && err.message.startsWith('HTTP 404')) {
-      throw err;
-    }
-    // If backend is unreachable or in static preview, attempt static fallback
-    if (options.method && options.method !== 'GET') {
-      throw err;
-    }
-    return handleStaticFallback<T>(path);
+    throw err instanceof Error ? err : new Error('Backend API unavailable.');
   }
 }
 
@@ -359,7 +366,7 @@ export function useRunStream(runId: string | undefined, onEvent: (event: any) =>
   const [connected, setConnected] = useState(false);
 
   useEffect(() => {
-    if (!runId) return;
+    if (!runId || ((import.meta as any).env?.VITE_APP_MODE || 'PUBLIC_VIEWER') !== 'LOCAL_OPERATOR') return;
 
     const sseUrl = `${API_BASE}/runs/${runId}/stream`;
     try {

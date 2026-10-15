@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
-import { Report } from '../contracts/index.js';
+import { Report, ReportSchema } from '../contracts/index.js';
 
 export function createSnapshotRouter(): Router {
   const router = Router();
@@ -265,7 +265,10 @@ export function createSnapshotRouter(): Router {
         createdAt: r.createdAt,
         startedAt: r.startedAt,
         finishedAt: r.finishedAt,
-        assertionsSummary: r.assertionsSummary
+        assertionsSummary: r.assertionsSummary || {
+          total: (r.assertionResults || []).length,
+          passed: (r.assertionResults || []).filter((assertion: any) => assertion.status === 'pass').length
+        }
       })),
       nextCursor: null
     });
@@ -293,6 +296,14 @@ export function createSnapshotRouter(): Router {
       return res.status(404).json({ error: { code: 'NOT_FOUND', message: `Recorded run ${req.params.id} not found.` } });
     }
 
+    if (run.report) {
+      const parsed = ReportSchema.safeParse(run.report);
+      if (!parsed.success || parsed.data.run.id !== run.id || parsed.data.run.provenance !== 'recorded_example') {
+        return res.status(503).json({ error: { code: 'INVALID_RECORDED_REPORT', message: 'Recorded evidence failed validation.' } });
+      }
+      return res.json(parsed.data);
+    }
+
     const report: Report = {
       schemaVersion: '1.0',
       reportId: `report-${run.id}`,
@@ -307,7 +318,7 @@ export function createSnapshotRouter(): Router {
         environmentId: run.environmentId,
         environmentRevision: run.environmentRevision || 'v1.0.0',
         buildCommit: run.buildCommit || null,
-        toolVersions: run.toolVersions || { node: 'v22.16.0' }
+        toolVersions: run.toolVersions || {}
       },
       environmentSnapshot: {
         label: 'Recorded Lab Topology (gateway -> orders -> ledger)',
@@ -328,15 +339,12 @@ export function createSnapshotRouter(): Router {
       },
       methodology: {
         description: scenarioDefinitions[run.scenarioId]?.description || 'Rehearsal execution methodology',
-        sampleCount: run.events?.filter((e: any) => e.type === 'tls_probe').length || 10,
-        windows: run.methodology?.windows || [
-          { phase: 'baseline', sampleCount: 5, targetService: 'orders' },
-          { phase: 'verification', sampleCount: 5, targetService: 'orders' }
-        ]
+        sampleCount: run.events?.filter((e: any) => e.type === 'tls_probe').length || 0,
+        windows: run.methodology?.windows || []
       },
       assertions: run.assertionResults || [],
       measurements: run.events?.filter((e: any) => e.type === 'tls_probe').map((e: any) => e.data) || [],
-      recovery: run.recoveryResult || { status: 'verified', evidenceEventIds: [], completedAt: run.finishedAt },
+      recovery: run.recoveryResult || { status: 'not_run', evidenceEventIds: [] },
       evidenceEvents: run.events || [],
       limitations: run.limitations || []
     };

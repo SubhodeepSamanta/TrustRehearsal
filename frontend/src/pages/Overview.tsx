@@ -136,7 +136,7 @@ export default function Overview({ mode: _mode }: OverviewProps) {
                     ? 'Observed leaf certificate differed from active serving TLS context before reload. In-memory TLS context reload successfully updated the served fingerprint without dropping service connections.'
                     : latestRun.scenarioId === 'S02'
                     ? 'Simulated CA proxy network partition. Data-plane requests continued uninterrupted while certificate renewal attempts failed predictably and safely.'
-                    : 'Evaluated trust root migration. Abrupt leaf transition strictly rejected by Root A callers, while staged dual-trust bundle enabled seamless zero-downtime rollover.'}
+                    : 'Tested trust-root migration. Abrupt replacement was rejected; staged migration completed with a verified application request. Inspect the sampled evidence.'}
                 </p>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: 20, marginTop: 20, fontSize: 13, flexWrap: 'wrap' }}>

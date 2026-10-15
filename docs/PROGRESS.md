@@ -1,20 +1,19 @@
 # Implementation progress
 
-Last updated: 15 October 2026.
+Last updated: 16 October 2026.
 
 ## Current state
 
-All 6 implementation phases complete. TrustRehearsal is fully implemented, verified, and passing:
-- Full application split into `frontend/` (React, Vite, TypeScript, quiet precision design system) and `backend/` (Node.js/Express, MongoDB, worker, PKI manager, sample HTTPS services, strict TLS probe).
-- Real TLS evidence demonstrated across all three scenarios (S01, S02, S03).
-- Clean consecutive repetitions verified with baseline recovery.
-- Full test suite passing 15/15 tests across contracts, TLS proof, durable backend, scenarios S02/S03, and security/viewer mode.
-- Production build verified.
-- Complete documentation and verification runbook updated in `README.md` and `docs/`.
+The latest repair implementation and nine recorded scenario runs are present. The final public-viewer verification is in progress; do not interpret earlier phase completion entries as independent release certification.
+
+- The implementation agent records 27 backend tests and a production build in Phase 8 below. These are historical execution claims, not a fresh independent run of the entire suite.
+- Independent recheck on 16 October confirmed: actual S03 final application HTTP 200; ledger migrated to Root B; anonymous issuer and management requests denied; S02 fault traversed HTTP; missing frontend evidence no longer becomes positive measurements.
+- TypeScript checks were rerun in the final review. Final viewer/browser/build results are appended when completed.
+- Public viewing requires no credentials. Privileged local execution remains authenticated.
 
 ## Active phase
 
-All planned phases complete. Application ready for local operator execution and public viewer deployment.
+Final targeted repairs verified for the recorded public viewer. Preserve all existing uncommitted changes; no automatic commit or remote push. This is a portfolio demonstration, not certification of production operation.
 
 ## Completed
 
@@ -169,3 +168,25 @@ All planned phases complete. Application ready for local operator execution and 
   - `backend/dist/export/recorded-snapshots.json`
 - Next actions: Proceed to final git commit and present verified handoff per CEO experience requirements.
 
+
+### Final independent correction pass — 16 October 2026
+
+- Removed live-to-recorded error fallback; the frontend defaults explicitly to PUBLIC_VIEWER, while LOCAL_OPERATOR errors remain errors.
+- Public adapter rejects writes, validates embedded canonical reports and preserves provenance.
+- Corrected backend viewer report fallback: no fabricated samples, sample windows, tool versions or verified recovery. Prefer the exported canonical report.
+- Public environment topology now comes from recorded report data, including its edges.
+- Vite resolves project-root public environment configuration.
+- Independent checks use separate temporary lab state and ephemeral ports; no application database changes.
+- No commit, publication or remote push performed.
+
+### Independently observed final results — 16 October 2026
+
+- Backend Vitest suite rerun: 27/27 passed across 6 files; 36.99 seconds. Test-only MongoDB and ephemeral service ports were used.
+- Typecheck passed for backend/frontend; production build passed. The final build was repeated after the event-schema correction.
+- Independent canonical viewer checker: 117 assertions passed across 9 recorded runs; validates report schemas, exact evidence references/counts, default viewer with no API requests, pagination, write denial, unknown IDs, and backend canonical report equality.
+- Browser: built static viewer served without API/Mongo/lab at http://127.0.0.1:62996; overview, S03 evidence (54 events) and printable report (27 TLS samples) opened without login.
+- Mobile overview/report checked at 390px: document width 375px, no page overflow; no login visible.
+- Corrected a blank assertion summary by deriving counts from actual recorded assertions. Removed unmeasured zero-downtime wording from the overview.
+- Event schema now accepts the actual renewal_attempt_failed records used by S02.
+- Evidence: final-viewer-results.json and final-viewer-check.cjs in the independent review directory.
+- Remaining scope: this pass does not certify multi-process failover, persistent per-operation fencing or every recovery deadline; production operator hardening remains separate from the read-only CEO demonstration.

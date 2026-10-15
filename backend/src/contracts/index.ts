@@ -112,6 +112,7 @@ export const RunEventTypeSchema = z.enum([
   'phase_started',
   'phase_finished',
   'certificate_issued',
+  'renewal_attempt_failed',
   'profile_installed',
   'context_reloaded',
   'tls_probe',
