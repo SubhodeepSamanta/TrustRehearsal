@@ -229,3 +229,13 @@ Final targeted repairs verified for the recorded public viewer. Preserve all exi
 - Added root `start` script (`node backend/dist/index.js`) to `package.json` for seamless Render zero-config start commands.
 - Verified MongoDB connection semantics: checked Atlas SRV query requirement and highlighted `0.0.0.0/0` IP Access List prerequisite for dynamic cloud outbound IPs.
 - Committed and pushed to `main` branch on GitHub repository.
+
+### Render Production Build & Type Definition Fix — 16 October 2026
+
+- Fixed Render `tsc` build failure caused by `NODE_ENV=production` pruning `devDependencies`:
+  - Moved TypeScript and all `@types/*` definitions (`@types/node`, `@types/express`, `@types/bcryptjs`, `@types/cookie-parser`, `@types/cors`, `@types/node-forge`) into `dependencies` in `backend/package.json`.
+  - Moved Vite and React type dependencies into `dependencies` in `frontend/package.json` to prevent missing compiler/bundler tools when npm prunes devDependencies during production builds.
+  - Added `"types": ["node"]`, `"lib": ["ES2022", "DOM"]`, and `"typeRoots"` to `backend/tsconfig.json` to ensure ambient Node and DOM globals are resolved in hoisted monorepo setups.
+- Verified MongoDB Atlas connection: cluster resumed successfully, `mongoose.connect()` verified and connected to `Cluster0`.
+- Verified local builds and tests: `npm run typecheck` passed cleanly across both packages, `npm run build` succeeded, and 27/27 Vitest tests passed.
+- Pushed changes to `main` branch.
