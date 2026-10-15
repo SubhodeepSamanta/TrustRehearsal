@@ -4,14 +4,15 @@ Last updated: 15 October 2026.
 
 ## Current state
 
-Phases 0, 1, 2, 3, and 4 complete. All 3 scenarios (S01, S02, S03) executed with real cryptographic proofs and retained evidence:
-- S01: Renewal mismatch detection and context reload recovery.
-- S02: Controlled CA proxy partition, verified data plane authentication, and restored renewal.
-- S03: Negative control rejection under Root A trust, controlled dual-trust rollover, and baseline reset.
+Phases 0, 1, 2, 3, 4, and 5 complete. Public read-only viewer mode, sanitized snapshot export, and security boundaries verified:
+- Mutation endpoints (`POST /runs`, `POST /runs/:id/cancel`, `POST /environments/:id/reset`) strictly deny anonymous callers (401) and viewer mode requests (403 `LIVE_DISABLED`).
+- CSRF validation enforced on state mutations.
+- Exported snapshots and reports contain zero private key PEM markers or secrets.
+- Full test suite passing 15/15 tests across contracts, TLS proof, durable backend, scenarios S02/S03, and security/viewer mode.
 
 ## Active phase
 
-Next: Phase 5 in 09-build-plan.md (Viewer mode and release hardening: export redacted runs, implement public read-only adapter, and security tests).
+Next: Phase 6 in 09-build-plan.md (Presentation pack: documentation updates, startup and verification runbook, and final handoff).
 
 ## Completed
 
@@ -112,5 +113,18 @@ Next: Phase 5 in 09-build-plan.md (Viewer mode and release hardening: export red
   - `npm run test --workspace=backend`: 10/10 passed across all suites.
 - Evidence: Run records for S02 (`test-s02-...`) and S03 (`test-s03-...`) persisted in MongoDB with verified assertion outcomes.
 - Decisions/deviations: None.
-- Remaining limitations: Export of sanitized runs for public viewer mode to be generated in Phase 5.
-- Next action: Implement Phase 5: Viewer mode and release hardening with snapshot export, security verification (CSRF, mode denial, auth), and responsive review.
+### Phase 5 — Viewer mode and release hardening — 15 October 2026
+
+- Status: complete.
+- Changes:
+  - `backend/src/export/exportRuns.ts`: Script exporting sanitized recorded runs from MongoDB to `backend/src/export/recorded-snapshots.json` and `frontend/public/data/snapshots.json`. All 7 live executions sanitized; verified zero private keys or password hashes.
+  - `backend/src/api/snapshotAdapter.ts`: Standalone read-only snapshot router mounted when `MODE=PUBLIC_VIEWER`. Live execution worker and CA keys not instantiated. Mutation endpoints return 403 `LIVE_DISABLED`.
+  - `backend/src/index.ts`: Dynamic import of snapshot adapter in viewer mode.
+  - `backend/vitest.config.ts`: Added `fileParallelism: false` to ensure reliable port isolation across integration test suites.
+  - `backend/tests/integration/security-and-viewer.test.ts`: Integration test suite verifying anonymous mutation denial (401), invalid CSRF denial (403), viewer mutation denial (403), and secret redaction.
+- Commands and results:
+  - `npm run test --workspace=backend`: 15/15 tests passed across 5 suites.
+- Evidence: Redacted snapshot files created; security test asserts zero PEM markers or credentials.
+- Decisions/deviations: None.
+- Remaining limitations: Final presentation documentation updates to be completed in Phase 6.
+- Next action: Implement Phase 6: Update README, architecture docs, runbook, and final handoff summary.

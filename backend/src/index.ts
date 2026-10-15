@@ -26,6 +26,12 @@ let controller: LabController;
 let engine: RunExecutionEngine;
 
 export async function bootstrapApp(): Promise<express.Application> {
+  if (mode === 'PUBLIC_VIEWER') {
+    const { createSnapshotRouter } = await import('./api/snapshotAdapter.js');
+    app.use('/api/v1', createSnapshotRouter());
+    return app;
+  }
+
   await connectDb();
   await seedEnvironmentAndScenarios();
 
