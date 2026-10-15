@@ -190,3 +190,11 @@ Final targeted repairs verified for the recorded public viewer. Preserve all exi
 - Event schema now accepts the actual renewal_attempt_failed records used by S02.
 - Evidence: final-viewer-results.json and final-viewer-check.cjs in the independent review directory.
 - Remaining scope: this pass does not certify multi-process failover, persistent per-operation fencing or every recovery deadline; production operator hardening remains separate from the read-only CEO demonstration.
+
+### GitHub handoff — 16 October 2026
+
+- Committed the independently reviewed viewer corrections as 60de384.
+- Rewrote README around the implemented scenarios, credential-free recorded viewer, reproducible setup, and measured verification.
+- Replaced misleading mockup images with an actual application screenshot and a source-controlled SVG architecture diagram.
+- Clarified server-authenticated TLS, local operator limitations, static hosting requirements, and remaining production hardening.
+- User authorized publishing source to https://github.com/SubhodeepSamanta/TrustRehearsal.git; preparing the documentation commit and remote push.
