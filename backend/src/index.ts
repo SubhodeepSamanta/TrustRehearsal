@@ -25,7 +25,7 @@ dotenv.config();
 
 const app = express();
 const port = parseInt(process.env.PORT || '4000', 10);
-const host = process.env.HOST || '127.0.0.1';
+const host = process.env.HOST || (process.env.NODE_ENV === 'production' ? '0.0.0.0' : '127.0.0.1');
 
 // Strict validation of deployment mode (no silent fallback on invalid input)
 const rawMode = process.env.MODE || 'LOCAL_OPERATOR';
@@ -52,16 +52,14 @@ export async function bootstrapApp(): Promise<express.Application> {
   if (mode === 'PUBLIC_VIEWER') {
     const { createSnapshotRouter } = await import('./api/snapshotAdapter.js');
     app.use('/api/v1', createSnapshotRouter());
-    return app;
-  }
+  } else {
+    await connectDb();
+    await seedEnvironmentAndScenarios();
 
-  await connectDb();
-  await seedEnvironmentAndScenarios();
+    controller = new LabController();
+    await controller.initialize();
 
-  controller = new LabController();
-  await controller.initialize();
-
-  engine = new RunExecutionEngine(controller);
+    engine = new RunExecutionEngine(controller);
 
   // Startup reconciliation: clean up any abandoned active runs from crashes or hard interrupts
   try {
@@ -112,8 +110,25 @@ export async function bootstrapApp(): Promise<express.Application> {
     console.warn('[Startup Reconciliation] Error during startup reconciliation:', err);
   }
 
-  const apiRouter = createApiRouter(mode, engine, controller);
-  app.use('/api/v1', apiRouter);
+    const apiRouter = createApiRouter(mode, engine, controller);
+    app.use('/api/v1', apiRouter);
+  }
+
+  // Serve static frontend build if present (e.g. single-service deployment on Render)
+  const candidateDists = [
+    path.resolve(process.cwd(), 'frontend/dist'),
+    path.resolve(process.cwd(), '../frontend/dist'),
+  ];
+  for (const distPath of candidateDists) {
+    if (fs.existsSync(distPath)) {
+      app.use(express.static(distPath));
+      app.get('*', (req, res, next) => {
+        if (req.path.startsWith('/api')) return next();
+        res.sendFile(path.join(distPath, 'index.html'));
+      });
+      break;
+    }
+  }
 
   return app;
 }
