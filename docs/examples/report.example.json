@@ -1,0 +1,43 @@
+{
+  "schemaVersion": "1.0",
+  "reportId": "planning-example-only",
+  "generatedAt": "2026-10-15T00:00:00.000Z",
+  "run": {
+    "id": "planning-example-only",
+    "provenance": "recorded_example",
+    "lifecycle": "completed",
+    "outcome": "inconclusive",
+    "scenarioId": "S01",
+    "scenarioVersion": "1",
+    "environmentId": "sample-lab",
+    "environmentRevision": "planning-only",
+    "buildCommit": null,
+    "toolVersions": {}
+  },
+  "environmentSnapshot": {
+    "label": "Planning example; no execution",
+    "services": [],
+    "edges": []
+  },
+  "scenarioSnapshot": {
+    "id": "S01",
+    "version": "1",
+    "label": "Renewal without application reload"
+  },
+  "methodology": {
+    "description": "Shape example only. No probes or lab operations were executed.",
+    "sampleCount": 0,
+    "windows": []
+  },
+  "assertions": [],
+  "measurements": [],
+  "recovery": {
+    "status": "not_run",
+    "evidenceEventIds": []
+  },
+  "evidenceEvents": [],
+  "limitations": [
+    "Planning-only example, not a measured run or a release fixture.",
+    "Implementation must define and validate the full report contract before use."
+  ]
+}
