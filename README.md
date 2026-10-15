@@ -2,44 +2,110 @@
 
 **Rehearse cryptographic change. See what breaks before production.**
 
-Planning pack prepared 15 October 2026. This directory contains the implementation specification, not a working application. No runtime, deployment, or company integration is claimed.
+TrustRehearsal executes bounded certificate and trust-change experiments against running applications, measures actual TLS behavior across fresh handshakes, explains observed failures, and exports inspectable evidence.
 
-TrustRehearsal will execute bounded certificate and trust-change experiments against a local sample application, measure actual TLS behavior, and export inspectable evidence. It is an independent portfolio project intended to demonstrate product and engineering judgment to Puneet Singh at Encryption Consulting.
+---
 
-## Start here
+## Architecture & Project Structure
 
-1. Read [Product brief](docs/01-product-brief.md) and [Build plan](docs/09-build-plan.md).
-2. Open this project directory in the coding tool using your chosen Luna or Terra model.
-3. Paste [Start prompt](docs/prompts/START-HERE.md). It asks for phase 0 only.
-4. Use [Continuation prompt](docs/prompts/CONTINUE.md) for each subsequent phase.
-5. Keep [Progress](docs/PROGRESS.md) current. Resume from it instead of replanning.
+The project is cleanly structured into two primary workspace folders:
 
-## Specification map
+- **`frontend/`**: Complete React web application powered by Vite and TypeScript.
+  - Quiet engineering precision design system (`docs/07-design-system.md`).
+  - Interactive topology diagram with live serving and installed certificate profiles.
+  - Real-time Server-Sent Events (SSE) execution timeline with raw JSON disclosures.
+  - Verification assertions linking to real evidence event IDs.
+  - Printable A4 reports and JSON export.
+  - Side-by-side run comparison with provenance indicators.
+- **`backend/`**: Node.js and Express API server with durable run worker.
+  - **`src/contracts/`**: Zod schemas and TypeScript types for all models, probes, and reports.
+  - **`src/lab/`**: PKI manager generating Root CAs A and B, leaf certificates with SANs, live HTTPS sample services (`gateway`, `orders`, `ledger`), and strict TLS probe.
+  - **`src/worker/`**: Worker execution engine managing atomic leases with monotonic fencing tokens, heartbeat timers, and S01, S02, S03 scenario state machines.
+  - **`src/db/`**: MongoDB persistence with Mongoose models, partial unique indexes preventing concurrent runs, and TTL sessions.
+  - **`src/api/`**: REST API routes, CSRF and session management, and read-only snapshot router for viewer mode.
+  - **`src/export/`**: Sanitized snapshot exporter ensuring zero private keys or secrets in public builds.
 
-| Document | Purpose |
-|---|---|
-| [01 Product brief](docs/01-product-brief.md) | Positioning, audience, scope, honest claims |
-| [02 SRS](docs/02-srs.md) | Requirements and acceptance criteria |
-| [03 User flows](docs/03-user-flows.md) | Final visitor/operator experience and screen states |
-| [04 Architecture](docs/04-architecture.md) | Runtime boundaries, stack, repository structure |
-| [05 Data and API](docs/05-data-and-api.md) | Models, contracts, concurrency, events |
-| [06 Scenario specifications](docs/06-scenarios.md) | Reproducible experiments and independent assertions |
-| [07 Design system](docs/07-design-system.md) | Visual direction and component rules |
-| [08 Security](docs/08-security.md) | Threat model, isolation, abuse controls |
-| [09 Build plan](docs/09-build-plan.md) | Ordered phases, checks, stop conditions |
-| [10 Verification](docs/10-verification.md) | Tests, screenshots, release gates |
-| [11 Deployment and demo](docs/11-deployment-and-demo.md) | Operating modes, runbook, walkthrough, outreach |
-| [12 Research and decisions](docs/12-research-and-decisions.md) | Evidence, overlap, sources, deferred work |
-| [Progress](docs/PROGRESS.md) | Durable implementation handoff |
+---
 
-## Constraints
+## Operating Modes
 
-- TypeScript throughout. React frontend, Express API, MongoDB, separate Node worker and lab services.
-- Real TLS evidence is the product. Interface polish cannot substitute for it.
-- Version 1 uses lab certificates and sample services only. No third-party scanning.
-- No LLM API dependency, paid services, Kubernetes, Redis, or production PKI integration in version 1.
-- Public deployment is read-only. Live mutation is operator-only and disabled by default.
-- Do not present this as an Encryption Consulting product, an established market gap, a compliance certification, or proof of production safety.
-- TrustRehearsal is a working name; name and trademark clearance have not been completed.
+1. **`LOCAL_OPERATOR`**: Full local lab with live execution worker, authenticated operator control, and dynamic context reloading.
+2. **`PUBLIC_VIEWER`**: Read-only distribution backed by sanitized recorded runs from real lab executions. All mutation endpoints return `403 LIVE_DISABLED`.
 
-See AGENTS.md for implementation instructions. Do not automatically create a new chat, change models, publish the site, or contact anyone.
+---
+
+## Getting Started
+
+### Prerequisites
+
+- Node.js 22 LTS or newer
+- npm 11 or newer
+- MongoDB running locally on `127.0.0.1:27017` (or configured via `MONGODB_URI`)
+
+### Setup
+
+```bash
+# Clone and enter the workspace
+cd TrustRehearsal
+
+# Install dependencies for both frontend and backend
+npm install
+
+# Copy environment variables
+cp .env.example .env
+```
+
+### Running Locally
+
+```bash
+# Start backend API (runs on http://127.0.0.1:4000)
+npm run dev:backend
+
+# Start frontend application (runs on http://127.0.0.1:5173)
+npm run dev:frontend
+```
+
+### Operator Credentials
+
+- **Default Password**: `operator-rehearsal-2026`
+- Operator authentication is required for state-changing actions (starting rehearsals, baseline reset, cancellation).
+
+### Service Ports
+
+- **Frontend**: `http://localhost:5173`
+- **Backend API**: `http://localhost:4000`
+- **Gateway Service (HTTPS)**: `https://127.0.0.1:8443`
+- **Orders Service (HTTPS)**: `https://127.0.0.1:8444`
+- **Ledger Service (HTTPS)**: `https://127.0.0.1:8445`
+- **Management Ports (Internal Loopback)**: `18443`, `18444`, `18445`
+
+---
+
+## Verification & Tests
+
+```bash
+# Typecheck both frontend and backend
+npm run typecheck
+
+# Run complete test suite (contracts, TLS proof, scenarios S01-S03, security)
+npm run test
+
+# Production build
+npm run build
+```
+
+---
+
+## Scenarios Proven
+
+1. **S01 — Renewal without application reload**: Proves the distinction between disk certificate renewal and active serving TLS context. Detects mismatch and verifies hot reload without process restart.
+2. **S02 — Issuance-path unavailability**: Simulates CA network partition via controlled proxy; proves currently valid certificates continue authenticating without disruption, and restores renewal.
+3. **S03 — Trust-root rollover**: Demonstrates abrupt root replacement failure (strict negative control) and proves a safe dual-trust staged rollover sequence.
+
+---
+
+## Honest Claims
+
+- Observations reflect explicit sampled windows in the local lab environment.
+- Phrase used: *"Observed 0 failed fresh connections across 30 samples in this lab."*
+- TrustRehearsal is an independent engineering portfolio project. No production safety guarantee, compliance certification, or external company integration is claimed.

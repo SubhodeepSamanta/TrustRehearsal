@@ -4,15 +4,17 @@ Last updated: 15 October 2026.
 
 ## Current state
 
-Phases 0, 1, 2, 3, 4, and 5 complete. Public read-only viewer mode, sanitized snapshot export, and security boundaries verified:
-- Mutation endpoints (`POST /runs`, `POST /runs/:id/cancel`, `POST /environments/:id/reset`) strictly deny anonymous callers (401) and viewer mode requests (403 `LIVE_DISABLED`).
-- CSRF validation enforced on state mutations.
-- Exported snapshots and reports contain zero private key PEM markers or secrets.
+All 6 implementation phases complete. TrustRehearsal is fully implemented, verified, and passing:
+- Full application split into `frontend/` (React, Vite, TypeScript, quiet precision design system) and `backend/` (Node.js/Express, MongoDB, worker, PKI manager, sample HTTPS services, strict TLS probe).
+- Real TLS evidence demonstrated across all three scenarios (S01, S02, S03).
+- Clean consecutive repetitions verified with baseline recovery.
 - Full test suite passing 15/15 tests across contracts, TLS proof, durable backend, scenarios S02/S03, and security/viewer mode.
+- Production build verified.
+- Complete documentation and verification runbook updated in `README.md` and `docs/`.
 
 ## Active phase
 
-Next: Phase 6 in 09-build-plan.md (Presentation pack: documentation updates, startup and verification runbook, and final handoff).
+All planned phases complete. Application ready for local operator execution and public viewer deployment.
 
 ## Completed
 
@@ -126,5 +128,18 @@ Next: Phase 6 in 09-build-plan.md (Presentation pack: documentation updates, sta
   - `npm run test --workspace=backend`: 15/15 tests passed across 5 suites.
 - Evidence: Redacted snapshot files created; security test asserts zero PEM markers or credentials.
 - Decisions/deviations: None.
-- Remaining limitations: Final presentation documentation updates to be completed in Phase 6.
-- Next action: Implement Phase 6: Update README, architecture docs, runbook, and final handoff summary.
+### Phase 6 — Presentation pack and handoff — 15 October 2026
+
+- Status: complete.
+- Changes:
+  - `README.md`: Updated with full architecture overview, structure map (`frontend/` and `backend/`), operating modes, prerequisites, startup runbook, service ports, test commands, scenario descriptions, and honest claims statement.
+  - `docs/04-architecture.md`: Updated repository target reflecting `frontend/` and `backend/` folder separation.
+  - `docs/PROGRESS.md`: Complete audit of all 6 completed phases.
+- Commands and results:
+  - `npm run typecheck`: passed cleanly for both backend and frontend.
+  - `npm run test`: 15/15 passed across all 5 test suites.
+  - `npm run build`: built production bundles for backend and frontend.
+- Evidence: Fully tested application ready for local demonstration and public export.
+- Decisions/deviations: Folder structure organized into `frontend/` and `backend/` as requested by user.
+- Remaining limitations: External production integrations and live third-party scanning are intentionally deferred per V1 scope.
+- Next action: Project complete and ready for operator review and deployment.

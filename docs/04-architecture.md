@@ -35,7 +35,12 @@ Prefer service-owned volumes and controlled profile installation over sharing CA
 
 ## Repository target
 
-apps/web, apps/api, apps/worker, packages/contracts, packages/scenarios, lab/controller, lab/services, lab/compose.yaml, lab/bootstrap, tests/integration, tests/e2e, docs, scripts, .env.example. Structure may be simplified if boundaries stay explicit. Keep shared contracts free of server secrets.
+- `frontend/`: Complete React web application, Vite bundler, CSS modules with design tokens, topology SVG diagram, live SSE timeline, evidence explorer, printable reports, and run comparison.
+- `backend/`: Node.js/Express API, durable MongoDB models, worker execution engine, lab controller, PKI manager (Root CAs A and B), sample HTTPS services (gateway, orders, ledger), strict TLS probe, and Zod contracts.
+- `backend/src/contracts/`: Shared schemas, types, and API contracts.
+- `backend/src/export/`: Sanitized snapshot exporter and recorded runs for read-only viewer mode.
+- `backend/tests/`: Integration and contract test suites.
+- `docs/`: Product brief, SRS, architecture, security model, and progress tracker.
 
 ## Job and event strategy
 
