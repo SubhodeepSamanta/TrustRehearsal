@@ -81,3 +81,29 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
     scroll-behavior: auto !important;
   }
 }
+
+@media print {
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+  .no-print, nav, aside {
+    display: none !important;
+  }
+  main {
+    padding: 0 !important;
+    max-width: 100% !important;
+  }
+}
+
+@media (max-width: 1024px) {
+  main {
+    padding: 24px !important;
+  }
+}
+
+@media (max-width: 768px) {
+  main {
+    padding: 16px !important;
+  }
+}
