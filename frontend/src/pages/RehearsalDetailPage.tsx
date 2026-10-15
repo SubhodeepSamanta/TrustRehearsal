@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { apiFetch } from '../api/client.js';
-import { Play, CheckCircle2, AlertTriangle, ArrowLeft, ArrowRight, History } from 'lucide-react';
+import { Play, CheckCircle2, AlertTriangle, ArrowLeft, ArrowRight, History, Lock } from 'lucide-react';
 
 interface RehearsalDetailPageProps {
   mode: 'LOCAL_OPERATOR' | 'PUBLIC_VIEWER';
@@ -22,6 +22,14 @@ export default function RehearsalDetailPage({ mode }: RehearsalDetailPageProps) 
     queryKey: ['environment', 'sample-lab'],
     queryFn: () => apiFetch<any>('/environments/sample-lab')
   });
+
+  const { data: session } = useQuery({
+    queryKey: ['operatorSession'],
+    queryFn: () => apiFetch<{ role: string; csrfToken: string | null }>('/operator/session'),
+    enabled: mode === 'LOCAL_OPERATOR'
+  });
+
+  const isOperatorAuthenticated = mode === 'LOCAL_OPERATOR' && session?.role === 'operator';
 
   const { data: runsData } = useQuery({
     queryKey: ['runs', 20],
@@ -124,26 +132,33 @@ export default function RehearsalDetailPage({ mode }: RehearsalDetailPageProps) 
 
         <div>
           {mode === 'LOCAL_OPERATOR' ? (
-            <button
-              onClick={() => startMutation.mutate()}
-              disabled={startMutation.isPending || isBusy || needsReset}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 8,
-                background: isBusy || needsReset ? 'var(--surface-muted)' : 'var(--accent)',
-                color: isBusy || needsReset ? 'var(--ink-muted)' : '#ffffff',
-                border: 'none',
-                padding: '10px 20px',
-                borderRadius: 'var(--radius-sm)',
-                fontWeight: 600,
-                fontSize: 14,
-                cursor: isBusy || needsReset ? 'not-allowed' : 'pointer'
-              }}
-            >
-              <Play size={16} fill={isBusy || needsReset ? 'var(--ink-muted)' : '#ffffff'} />
-              {startMutation.isPending ? 'Starting Rehearsal...' : isBusy ? 'Lab Busy' : needsReset ? 'Reset Required' : 'Start Rehearsal'}
-            </button>
+            isOperatorAuthenticated ? (
+              <button
+                onClick={() => startMutation.mutate()}
+                disabled={startMutation.isPending || isBusy || needsReset}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  background: isBusy || needsReset ? 'var(--surface-muted)' : 'var(--accent)',
+                  color: isBusy || needsReset ? 'var(--ink-muted)' : '#ffffff',
+                  border: 'none',
+                  padding: '10px 20px',
+                  borderRadius: 'var(--radius-sm)',
+                  fontWeight: 600,
+                  fontSize: 14,
+                  cursor: isBusy || needsReset ? 'not-allowed' : 'pointer'
+                }}
+              >
+                <Play size={16} fill={isBusy || needsReset ? 'var(--ink-muted)' : '#ffffff'} />
+                {startMutation.isPending ? 'Starting Rehearsal...' : isBusy ? 'Lab Busy' : needsReset ? 'Reset Required' : 'Start Rehearsal'}
+              </button>
+            ) : (
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--ink-secondary)', background: 'var(--surface-muted)', padding: '8px 14px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}>
+                <Lock size={14} color="var(--ink-muted)" />
+                <span>Operator Authentication Required</span>
+              </div>
+            )
           ) : latestRunForScenario ? (
             <Link
               to={`/runs/${latestRunForScenario.id}`}

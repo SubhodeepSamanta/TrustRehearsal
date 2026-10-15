@@ -109,9 +109,11 @@ const STATIC_SCENARIOS: Record<string, any> = {
 };
 
 async function handleStaticFallback<T>(path: string): Promise<T> {
+  const [pathname, queryString] = path.split('?');
+  const searchParams = new URLSearchParams(queryString || '');
   const snapshots = await loadStaticSnapshots();
 
-  if (path === '/meta') {
+  if (pathname === '/meta') {
     return {
       mode: 'PUBLIC_VIEWER',
       capabilities: {
@@ -124,11 +126,11 @@ async function handleStaticFallback<T>(path: string): Promise<T> {
     } as unknown as T;
   }
 
-  if (path === '/health') {
+  if (pathname === '/health') {
     return { status: 'ok', mode: 'PUBLIC_VIEWER', timestamp: new Date().toISOString() } as unknown as T;
   }
 
-  if (path === '/ready') {
+  if (pathname === '/ready') {
     return {
       ready: snapshots.length > 0,
       mode: 'PUBLIC_VIEWER',
@@ -137,11 +139,11 @@ async function handleStaticFallback<T>(path: string): Promise<T> {
     } as unknown as T;
   }
 
-  if (path === '/operator/session') {
+  if (pathname === '/operator/session') {
     return { role: 'viewer', csrfToken: null } as unknown as T;
   }
 
-  if (path === '/environments' || path === '/environments/sample-lab') {
+  if (pathname === '/environments' || pathname === '/environments/sample-lab') {
     const env = {
       id: 'sample-lab',
       revision: 'v1.0.0',
@@ -154,21 +156,21 @@ async function handleStaticFallback<T>(path: string): Promise<T> {
         { id: 'ledger', name: 'ledger', role: 'service', port: 8445, configuredIssuer: 'issuer-a', installedProfile: 'A0', status: 'healthy' }
       ]
     };
-    return (path === '/environments' ? [env] : env) as unknown as T;
+    return (pathname === '/environments' ? [env] : env) as unknown as T;
   }
 
-  if (path === '/scenarios') {
+  if (pathname === '/scenarios') {
     return Object.values(STATIC_SCENARIOS) as unknown as T;
   }
 
-  if (path.startsWith('/scenarios/')) {
-    const scenarioId = path.replace('/scenarios/', '');
+  if (pathname.startsWith('/scenarios/')) {
+    const scenarioId = pathname.replace('/scenarios/', '');
     const scenario = STATIC_SCENARIOS[scenarioId];
     if (!scenario) throw new Error(`HTTP 404: Scenario ${scenarioId} not found.`);
     return scenario as unknown as T;
   }
 
-  if (path === '/runs' || path.startsWith('/runs?')) {
+  if (pathname === '/runs' || pathname.startsWith('/runs?')) {
     return {
       runs: snapshots.map((r) => ({
         id: r.id,
@@ -188,8 +190,8 @@ async function handleStaticFallback<T>(path: string): Promise<T> {
     } as unknown as T;
   }
 
-  if (path.startsWith('/runs/')) {
-    const parts = path.split('/').filter(Boolean);
+  if (pathname.startsWith('/runs/')) {
+    const parts = pathname.split('/').filter(Boolean);
     const runId = parts[1];
     const sub = parts[2];
 
@@ -203,14 +205,43 @@ async function handleStaticFallback<T>(path: string): Promise<T> {
     }
 
     if (sub === 'events') {
-      return (run.events || []) as unknown as T;
+      let events = run.events || [];
+      const afterSeqStr = searchParams.get('afterSeq');
+      if (afterSeqStr !== null) {
+        const afterSeq = parseInt(afterSeqStr, 10);
+        if (!isNaN(afterSeq)) {
+          events = events.filter((e: any) => e.seq > afterSeq);
+        }
+      }
+      const limitStr = searchParams.get('limit');
+      if (limitStr !== null) {
+        const limit = parseInt(limitStr, 10);
+        if (!isNaN(limit)) {
+          events = events.slice(0, limit);
+        }
+      }
+      return events as unknown as T;
     }
 
     if (sub === 'report') {
+      if (run.report) {
+        return run.report as unknown as T;
+      }
+      const probeEvents = (run.events || []).filter((e: any) => e.type === 'tls_probe');
+      const sampleCount = run.methodology?.sampleCount !== undefined
+        ? run.methodology.sampleCount
+        : probeEvents.length;
+      const windows = run.methodology?.windows || [];
+      const recovery = run.recoveryResult || {
+        status: 'not_run',
+        evidenceEventIds: [],
+        completedAt: null
+      };
+
       const report = {
         schemaVersion: '1.0',
         reportId: `report-${run.id}`,
-        generatedAt: new Date().toISOString(),
+        generatedAt: run.finishedAt || run.createdAt || new Date().toISOString(),
         run: {
           id: run.id,
           provenance: 'recorded_example',
@@ -221,9 +252,9 @@ async function handleStaticFallback<T>(path: string): Promise<T> {
           environmentId: run.environmentId,
           environmentRevision: run.environmentRevision || 'v1.0.0',
           buildCommit: run.buildCommit || null,
-          toolVersions: run.toolVersions || { node: 'v22.16.0' }
+          toolVersions: run.toolVersions || null
         },
-        environmentSnapshot: {
+        environmentSnapshot: run.environmentSnapshot || {
           label: 'Recorded Lab Topology (gateway -> orders -> ledger)',
           services: [
             { id: 'gateway', role: 'caller', port: 8443, configuredIssuer: 'issuer-a', installedProfile: 'A0', status: 'healthy' },
@@ -235,22 +266,19 @@ async function handleStaticFallback<T>(path: string): Promise<T> {
             { id: 'edge-orders-ledger', caller: 'orders', callee: 'ledger', port: 8445 }
           ]
         },
-        scenarioSnapshot: {
+        scenarioSnapshot: run.scenarioSnapshot || {
           id: run.scenarioId,
           version: run.scenarioVersion || '1',
           label: STATIC_SCENARIOS[run.scenarioId]?.label || run.scenarioId
         },
         methodology: {
-          description: STATIC_SCENARIOS[run.scenarioId]?.description || 'Rehearsal execution methodology',
-          sampleCount: (run.events || []).filter((e: any) => e.type === 'tls_probe').length || 10,
-          windows: [
-            { phase: 'baseline', sampleCount: 5, targetService: 'orders' },
-            { phase: 'verification', sampleCount: 5, targetService: 'orders' }
-          ]
+          description: run.methodology?.description || STATIC_SCENARIOS[run.scenarioId]?.description || 'Rehearsal execution methodology',
+          sampleCount,
+          windows
         },
         assertions: run.assertionResults || [],
-        measurements: (run.events || []).filter((e: any) => e.type === 'tls_probe').map((e: any) => e.data),
-        recovery: run.recoveryResult || { status: 'verified', evidenceEventIds: [], completedAt: run.finishedAt },
+        measurements: probeEvents.map((e: any) => e.data),
+        recovery,
         evidenceEvents: run.events || [],
         limitations: run.limitations || []
       };
@@ -262,6 +290,11 @@ async function handleStaticFallback<T>(path: string): Promise<T> {
 }
 
 export async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const configuredMode = (import.meta as any).env?.VITE_APP_MODE;
+  if (configuredMode === 'PUBLIC_VIEWER') {
+    return handleStaticFallback<T>(path);
+  }
+
   const headers = new Headers(options.headers || {});
   headers.set('Content-Type', 'application/json');
 
@@ -285,6 +318,18 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
           throw new Error(`HTTP 404: Resource not found`);
         }
         throw new Error(errJson?.error?.message || `HTTP 404: Resource not found`);
+      }
+
+      if (res.status === 503 && path === '/meta') {
+        let errJson;
+        try {
+          errJson = await res.json();
+        } catch {}
+        return {
+          mode: 'UNAVAILABLE',
+          status: 'error',
+          error: errJson?.error?.message || 'Database unavailable'
+        } as unknown as T;
       }
 
       let errorJson;

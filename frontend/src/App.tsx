@@ -14,18 +14,28 @@ import ComparePage from './pages/ComparePage.js';
 import DocsPage from './pages/DocsPage.js';
 
 export default function App() {
+  const configuredMode = (import.meta as any).env?.VITE_APP_MODE;
+
   const { data: meta } = useQuery({
     queryKey: ['meta'],
-    queryFn: () => apiFetch<{ mode: 'LOCAL_OPERATOR' | 'PUBLIC_VIEWER' }>('/meta')
+    queryFn: () => apiFetch<{ mode: 'LOCAL_OPERATOR' | 'PUBLIC_VIEWER' | 'UNAVAILABLE' }>('/meta'),
+    enabled: configuredMode === 'LOCAL_OPERATOR'
   });
 
-  const mode = meta?.mode || ((import.meta as any).env?.VITE_APP_MODE === 'LOCAL_OPERATOR' ? 'LOCAL_OPERATOR' : 'PUBLIC_VIEWER');
+  const mode: 'LOCAL_OPERATOR' | 'PUBLIC_VIEWER' = configuredMode === 'LOCAL_OPERATOR'
+    ? 'LOCAL_OPERATOR'
+    : 'PUBLIC_VIEWER';
 
   return (
     <div className="app-container">
       <Navigation mode={mode} />
 
       <main className="app-main">
+        {mode === 'LOCAL_OPERATOR' && meta?.mode === 'UNAVAILABLE' && (
+          <div style={{ background: '#fef2f2', borderBottom: '1px solid #fee2e2', color: '#991b1b', padding: '10px 24px', fontSize: 13, fontWeight: 500 }}>
+            Backend API is unavailable. Live execution is disabled until connection is restored.
+          </div>
+        )}
         <Routes>
           <Route path="/" element={<Overview mode={mode} />} />
           <Route path="/environment" element={<EnvironmentPage />} />
