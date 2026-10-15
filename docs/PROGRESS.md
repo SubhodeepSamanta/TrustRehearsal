@@ -198,3 +198,10 @@ Final targeted repairs verified for the recorded public viewer. Preserve all exi
 - Replaced misleading mockup images with an actual application screenshot and a source-controlled SVG architecture diagram.
 - Clarified server-authenticated TLS, local operator limitations, static hosting requirements, and remaining production hardening.
 - User authorized publishing source to https://github.com/SubhodeepSamanta/TrustRehearsal.git; preparing the documentation commit and remote push.
+
+### README documentation entry points — 16 October 2026
+
+- Added a prominent SRS link in the opening navigation and a clickable requirements overview graphic near the top of the README.
+- Added direct links to architecture, scenarios, security, and verification records.
+- Distinguished SRS targets from independently verified implementation results.
+- Checked local README document and image references before committing and pushing.

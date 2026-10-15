@@ -8,13 +8,29 @@
 
 Certificate lifecycle resilience · Real TLS evidence · Credential-free recorded explorer
 
-[Explore the scenarios](#three-changes-worth-rehearsing) · [Run the demo](#open-the-recorded-demo) · [Read the design](docs/04-architecture.md)
+[Read the SRS](docs/02-srs.md) · [Architecture](docs/04-architecture.md) · [Explore the scenarios](#three-changes-worth-rehearsing) · [Run the demo](#open-the-recorded-demo)
 
 </div>
 
 ![Actual TrustRehearsal overview showing a recorded trust-root rollover and its assertions](docs/images/overview.png)
 
 *Actual application screenshot. The public explorer displays recorded lab evidence; it does not execute live experiments.*
+
+## Requirements and engineering documents
+
+[![TrustRehearsal requirements overview: controlled experiments, traceable evidence, and public exploration](docs/images/requirements-overview.svg)](docs/02-srs.md)
+
+**[Read the full Software Requirements Specification →](docs/02-srs.md)**
+
+| Document | What it covers |
+| --- | --- |
+| [Software requirements specification](docs/02-srs.md) | Functional requirements, priorities, acceptance evidence, nonfunctional targets, and outcome semantics. |
+| [System architecture](docs/04-architecture.md) | Component boundaries, service topology, and execution design. |
+| [Scenario specification](docs/06-scenarios.md) | Certificate renewal, issuance failure, and trust-root migration experiments. |
+| [Security model](docs/08-security.md) | Operator authentication, lab isolation, key handling, and public viewer boundaries. |
+| [Verification and progress](docs/PROGRESS.md) | Observed checks, implementation decisions, and remaining limitations. |
+
+The SRS records design requirements and acceptance targets. Check the verification and progress records for what has actually been demonstrated; some production-hardening targets remain open.
 
 ## Why it exists
 
