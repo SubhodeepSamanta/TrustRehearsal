@@ -8,7 +8,7 @@
 
 Certificate lifecycle resilience · Real TLS evidence · Credential-free recorded explorer
 
-[Read the SRS](docs/02-srs.md) · [Architecture](docs/04-architecture.md) · [Explore the scenarios](#three-changes-worth-rehearsing) · [Run the demo](#open-the-recorded-demo)
+[Download the SRS + HLD + LLD (PDF)](TrustRehearsal-SRS.pdf) · [Architecture](docs/04-architecture.md) · [Explore the scenarios](#three-changes-worth-rehearsing) · [Run the demo](#open-the-recorded-demo)
 
 </div>
 
@@ -18,13 +18,16 @@ Certificate lifecycle resilience · Real TLS evidence · Credential-free recorde
 
 ## Requirements and engineering documents
 
-[![TrustRehearsal requirements overview: controlled experiments, traceable evidence, and public exploration](docs/images/requirements-overview.svg)](docs/02-srs.md)
+### [Download the SRS + HLD + LLD (PDF)](TrustRehearsal-SRS.pdf)
 
-**[Read the full Software Requirements Specification →](docs/02-srs.md)**
+[![TrustRehearsal engineering specification cover](docs/images/srs-cover.png)](TrustRehearsal-SRS.pdf)
+
+*The consolidated 19-page engineering specification covers requirements, architecture, detailed design, security, and acceptance criteria.*
 
 | Document | What it covers |
 | --- | --- |
-| [Software requirements specification](docs/02-srs.md) | Functional requirements, priorities, acceptance evidence, nonfunctional targets, and outcome semantics. |
+| **[TrustRehearsal-SRS.pdf](TrustRehearsal-SRS.pdf)** · *([Source](docs/TrustRehearsal-SRS.md))* | **Consolidated SRS + HLD + LLD:** Functional requirements, component contracts, architecture diagrams, security threat model, and verification matrix. |
+| [Software requirements specification](docs/02-srs.md) | Planning-phase functional requirements, priorities, acceptance evidence, and outcome semantics. |
 | [System architecture](docs/04-architecture.md) | Component boundaries, service topology, and execution design. |
 | [Scenario specification](docs/06-scenarios.md) | Certificate renewal, issuance failure, and trust-root migration experiments. |
 | [Security model](docs/08-security.md) | Operator authentication, lab isolation, key handling, and public viewer boundaries. |

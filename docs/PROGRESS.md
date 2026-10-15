@@ -205,3 +205,19 @@ Final targeted repairs verified for the recorded public viewer. Preserve all exi
 - Added direct links to architecture, scenarios, security, and verification records.
 - Distinguished SRS targets from independently verified implementation results.
 - Checked local README document and image references before committing and pushing.
+
+### Consolidated SRS, HLD & LLD Specification Publication — 16 October 2026
+
+- Generated root engineering specification PDF: `TrustRehearsal-SRS.pdf` (19 pages, A4 format).
+- Authored complete markdown specification source: `docs/TrustRehearsal-SRS.md` covering all 13 numbered specification sections.
+- Created reproducible PDF generation pipeline under `docs/documentation/`:
+  - `generate_diagrams.py`: Generates 6 high-resolution vector diagrams (Cover PKI transition, System context, Data plane topology, S03 staged migration flow, Run lifecycle state machine, and Fresh-connection TLS probe sequence).
+  - `generate_srs_pdf.py`: Two-pass ReportLab generation script with automated Table of Contents page registration, clickable internal link annotations, PDF outline bookmark tree, and 200 DPI cover preview renderer.
+  - `images/`: Curated source-controlled assets including 6 vector diagrams and 5 real local lab application screenshots.
+- Rendered official cover preview image: `docs/images/srs-cover.png` directly from Page 1 of `TrustRehearsal-SRS.pdf`.
+- Featured prominent download link and clickable cover preview prominently near the top of `README.md`.
+- Verification performed:
+  - Validated all 19 pages with PyMuPDF: zero missing glyphs, balanced typography, and exact page numbers.
+  - Confirmed Table of Contents internal links jump to exact destination sections.
+  - Verified 27/27 Vitest backend test results and 117-assertion external review harness claims are accurately described.
+  - Confirmed honest claims: server-authenticated TLS only, S02 proxy 502 fault scope, zero credentials in public viewer, and remaining production hardening boundaries.
