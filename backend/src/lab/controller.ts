@@ -114,6 +114,19 @@ export class LabController {
 
     // Start CA issuance proxy
     this.caProxyServer = http.createServer((req, res) => {
+      // Authenticate and authorize issuer operations
+      const authHeader = req.headers['authorization'];
+      if (!authHeader || authHeader !== `Bearer ${this.managementToken}`) {
+        res.writeHead(401, { 'Content-Type': 'application/json' });
+        res.end(
+          JSON.stringify({
+            error: 'UNAUTHORIZED',
+            message: 'Missing or invalid management bearer token for CA issuance'
+          })
+        );
+        return;
+      }
+
       if (req.method === 'POST' && req.url === '/issue') {
         if (this.proxyFaultEnabled) {
           res.writeHead(502, { 'Content-Type': 'application/json' });
@@ -127,10 +140,36 @@ export class LabController {
         }
 
         let body = '';
-        req.on('data', (c) => (body += c));
+        let bodyLength = 0;
+        const MAX_BODY_SIZE = 16384; // 16KB limit
+
+        req.on('data', (c) => {
+          bodyLength += c.length;
+          if (bodyLength > MAX_BODY_SIZE) {
+            req.destroy();
+            res.writeHead(413, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'PAYLOAD_TOO_LARGE', message: 'Request exceeds maximum size limit' }));
+            return;
+          }
+          body += c;
+        });
+
         req.on('end', () => {
+          if (res.writableEnded) return;
           try {
             const data = JSON.parse(body);
+            const validServices = ['gateway', 'orders', 'ledger'];
+            if (!validServices.includes(data.serviceName)) {
+              res.writeHead(400, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ error: 'INVALID_SERVICE', message: `Invalid serviceName: ${data.serviceName}` }));
+              return;
+            }
+            if (data.caName !== 'A' && data.caName !== 'B') {
+              res.writeHead(400, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ error: 'INVALID_CA', message: `Invalid caName: ${data.caName}` }));
+              return;
+            }
+
             const ca = data.caName === 'B' ? this.certStore.rootB : this.certStore.rootA;
             const sanList = [data.serviceName, 'localhost', '127.0.0.1'];
             const cert = issueLeafCertificate(ca, data.serviceName, sanList);
@@ -178,14 +217,13 @@ export class LabController {
     caName: 'A' | 'B',
     profileName: string
   ): Promise<IssuedCertificate> {
-    if (this.proxyFaultEnabled && caName === 'A') {
-      throw new Error('HTTP 502 Bad Gateway: CA Issuance Proxy network partition simulated');
-    }
-
     if (this.caProxyServer && this.caProxyServer.listening) {
       const response = await fetch(`http://127.0.0.1:${this.caProxyPort}/issue`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.managementToken}`
+        },
         body: JSON.stringify({ serviceName, caName, profileName })
       });
 
@@ -263,7 +301,7 @@ export class LabController {
     errorCode?: string;
     durationMs: number;
   }> {
-    const certPem = caPem || this.certStore.rootA.certPem;
+    const certPem = caPem || `${this.certStore.rootA.certPem}\n${this.certStore.rootB.certPem}`;
     const start = process.hrtime.bigint();
 
     const gatewayPort = this.getServicePort('gateway') || 8443;

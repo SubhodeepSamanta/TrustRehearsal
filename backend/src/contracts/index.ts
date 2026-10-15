@@ -164,7 +164,8 @@ export const RunLifecycleSchema = z.enum([
   'completed',
   'failed',
   'cancelled',
-  'interrupted'
+  'interrupted',
+  'timed_out'
 ]);
 export type RunLifecycle = z.infer<typeof RunLifecycleSchema>;
 

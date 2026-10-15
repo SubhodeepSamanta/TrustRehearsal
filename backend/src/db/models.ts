@@ -61,7 +61,7 @@ const RunSchema = new Schema({
   lifecycle: {
     type: String,
     required: true,
-    enum: ['queued', 'preparing', 'running', 'recovering', 'completed', 'failed', 'cancelled', 'interrupted']
+    enum: ['queued', 'preparing', 'running', 'recovering', 'completed', 'failed', 'cancelled', 'interrupted', 'timed_out']
   },
   outcome: { type: String, enum: ['pass', 'fail', 'inconclusive'], default: null },
   active: { type: Boolean, default: false },
