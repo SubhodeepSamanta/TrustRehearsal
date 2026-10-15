@@ -136,10 +136,19 @@ All planned phases complete. Application ready for local operator execution and 
   - `docs/04-architecture.md`: Updated repository target reflecting `frontend/` and `backend/` folder separation.
   - `docs/PROGRESS.md`: Complete audit of all 6 completed phases.
 - Commands and results:
-  - `npm run typecheck`: passed cleanly for both backend and frontend.
-  - `npm run test`: 15/15 passed across all 5 test suites.
-  - `npm run build`: built production bundles for backend and frontend.
-- Evidence: Fully tested application ready for local demonstration and public export.
-- Decisions/deviations: Folder structure organized into `frontend/` and `backend/` as requested by user.
-- Remaining limitations: External production integrations and live third-party scanning are intentionally deferred per V1 scope.
-- Next action: Project complete and ready for operator review and deployment.
+### Final Review, Hardening & UX Polish — 15 October 2026
+
+- Status: complete.
+- Changes:
+  - `frontend/src/pages/ComparePage.tsx`: Upgraded with dynamic run selectors (Run A and Run B pickers), Run A/B swap control, side-by-side run header cards, and a comprehensive assertion comparison matrix highlighting identical vs divergent outcomes.
+  - `frontend/src/pages/RunsPage.tsx`: Added scenario filter pills (All, S01, S02, S03) and instant text search across Run ID and outcome.
+  - `frontend/src/pages/RunDetailPage.tsx`: Added interactive event type filters (TLS Probes, Phase Steps, Faults, Assertions), filtered timeline view, and raw formatted evidence JSON download button (`trustrehearsal-[id]-evidence.json`).
+  - `frontend/src/components/Navigation.tsx`: Integrated live API health status pulse polling `/health` with visual green/red indicator.
+  - `frontend/package.json`: Added workspace test script integration to root `npm run test`.
+- Commands and results:
+  - `npm run lab:verify`: Executed clean direct TLS probes against orders (8444) and ledger (8445) with verified SHA-256 fingerprints.
+  - `npm run test`: 15/15 backend Vitest tests passed across all 5 test files, and frontend typecheck passed with code 0.
+  - `npm run typecheck`: 0 errors across frontend and backend.
+  - `npm run build`: Production bundle built cleanly (backend TypeScript + frontend Vite bundle in 3.38s).
+- Evidence: Full end-to-end automated and manual browser verification passed with 100% green tests.
+- Next action: Goal complete. Release ready.
