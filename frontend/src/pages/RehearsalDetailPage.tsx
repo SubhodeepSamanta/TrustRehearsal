@@ -1,16 +1,14 @@
 import { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { apiFetch } from '../api/client.js';
-import { Play, CheckCircle2, AlertTriangle, ArrowLeft } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Play, CheckCircle2, AlertTriangle, ArrowLeft, ArrowRight, History } from 'lucide-react';
 
 interface RehearsalDetailPageProps {
   mode: 'LOCAL_OPERATOR' | 'PUBLIC_VIEWER';
-  isOperator: boolean;
 }
 
-export default function RehearsalDetailPage({ mode, isOperator }: RehearsalDetailPageProps) {
+export default function RehearsalDetailPage({ mode }: RehearsalDetailPageProps) {
   const { scenarioId } = useParams<{ scenarioId: string }>();
   const navigate = useNavigate();
   const [startError, setStartError] = useState<string | null>(null);
@@ -24,6 +22,13 @@ export default function RehearsalDetailPage({ mode, isOperator }: RehearsalDetai
     queryKey: ['environment', 'sample-lab'],
     queryFn: () => apiFetch<any>('/environments/sample-lab')
   });
+
+  const { data: runsData } = useQuery({
+    queryKey: ['runs', 20],
+    queryFn: () => apiFetch<{ runs: any[] }>('/runs?limit=20')
+  });
+
+  const latestRunForScenario = (runsData?.runs || []).find((r: any) => r.scenarioId === scenarioId);
 
   const startMutation = useMutation({
     mutationFn: () =>
@@ -110,10 +115,10 @@ export default function RehearsalDetailPage({ mode, isOperator }: RehearsalDetai
       }}>
         <div>
           <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink)' }}>
-            Execution Review & Readiness
+            {mode === 'LOCAL_OPERATOR' ? 'Execution Control & Readiness' : 'Recorded Rehearsal Overview'}
           </div>
           <div style={{ fontSize: 13, color: 'var(--ink-secondary)', marginTop: 4 }}>
-            Target: <strong>sample-lab</strong> | Max Duration: <strong>{scenario.maxDurationMs / 1000}s</strong> | State: <strong>{env?.state || 'ready'}</strong>
+            Target: <strong>sample-lab</strong> | Max Duration: <strong>{(scenario.maxDurationMs || 30000) / 1000}s</strong> | State: <strong>{env?.state || 'ready'}</strong>
           </div>
         </div>
 
@@ -121,28 +126,63 @@ export default function RehearsalDetailPage({ mode, isOperator }: RehearsalDetai
           {mode === 'LOCAL_OPERATOR' ? (
             <button
               onClick={() => startMutation.mutate()}
-              disabled={startMutation.isPending || isBusy || needsReset || !isOperator}
+              disabled={startMutation.isPending || isBusy || needsReset}
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: 8,
-                background: isBusy || needsReset || !isOperator ? 'var(--surface-muted)' : 'var(--accent)',
-                color: isBusy || needsReset || !isOperator ? 'var(--ink-muted)' : '#ffffff',
+                background: isBusy || needsReset ? 'var(--surface-muted)' : 'var(--accent)',
+                color: isBusy || needsReset ? 'var(--ink-muted)' : '#ffffff',
                 border: 'none',
                 padding: '10px 20px',
                 borderRadius: 'var(--radius-sm)',
                 fontWeight: 600,
                 fontSize: 14,
-                cursor: isBusy || needsReset || !isOperator ? 'not-allowed' : 'pointer'
+                cursor: isBusy || needsReset ? 'not-allowed' : 'pointer'
               }}
             >
-              <Play size={16} fill={isBusy || needsReset || !isOperator ? 'var(--ink-muted)' : '#ffffff'} />
-              {startMutation.isPending ? 'Starting Rehearsal...' : isBusy ? 'Lab Busy' : needsReset ? 'Reset Required' : !isOperator ? 'Operator Sign-In Required' : 'Start Rehearsal'}
+              <Play size={16} fill={isBusy || needsReset ? 'var(--ink-muted)' : '#ffffff'} />
+              {startMutation.isPending ? 'Starting Rehearsal...' : isBusy ? 'Lab Busy' : needsReset ? 'Reset Required' : 'Start Rehearsal'}
             </button>
+          ) : latestRunForScenario ? (
+            <Link
+              to={`/runs/${latestRunForScenario.id}`}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 8,
+                background: 'var(--accent)',
+                color: '#ffffff',
+                padding: '10px 18px',
+                borderRadius: 'var(--radius-sm)',
+                fontWeight: 600,
+                fontSize: 13,
+                textDecoration: 'none'
+              }}
+            >
+              <History size={15} />
+              Explore rehearsal
+              <ArrowRight size={15} />
+            </Link>
           ) : (
-            <div style={{ fontSize: 13, color: 'var(--ink-muted)' }}>
-              Live execution disabled in public viewer mode.
-            </div>
+            <Link
+              to="/runs"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 8,
+                background: 'var(--surface-muted)',
+                border: '1px solid var(--line)',
+                color: 'var(--ink)',
+                padding: '10px 18px',
+                borderRadius: 'var(--radius-sm)',
+                fontWeight: 600,
+                fontSize: 13,
+                textDecoration: 'none'
+              }}
+            >
+              Inspect evidence in runs
+            </Link>
           )}
         </div>
       </div>
@@ -155,7 +195,7 @@ export default function RehearsalDetailPage({ mode, isOperator }: RehearsalDetai
         padding: 24
       }}>
         <h3 style={{ fontSize: 16, fontWeight: 600, color: 'var(--ink)', marginBottom: 16 }}>
-          Execution Sequence ({scenario.phaseDefinitions?.length} Phases)
+          Execution Sequence ({scenario.phaseDefinitions?.length || 0} Phases)
         </h3>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -204,16 +244,16 @@ export default function RehearsalDetailPage({ mode, isOperator }: RehearsalDetai
                     </span>
                   )}
                 </div>
-                <div style={{ fontSize: 13, color: 'var(--ink-secondary)', marginTop: 2 }}>
+                <p style={{ fontSize: 12, color: 'var(--ink-secondary)', marginTop: 2 }}>
                   {phase.description}
-                </div>
+                </p>
               </div>
             </div>
           ))}
         </div>
       </div>
 
-      {/* Assertions */}
+      {/* Assertion Criteria */}
       <div style={{
         background: 'var(--surface)',
         border: '1px solid var(--line)',
@@ -221,28 +261,30 @@ export default function RehearsalDetailPage({ mode, isOperator }: RehearsalDetai
         padding: 24
       }}>
         <h3 style={{ fontSize: 16, fontWeight: 600, color: 'var(--ink)', marginBottom: 16 }}>
-          Verification Assertions ({scenario.assertionDefinitions?.length})
+          Automated Assertion Criteria ({scenario.assertionDefinitions?.length || 0} Assertions)
         </h3>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {(scenario.assertionDefinitions || []).map((assertion: any) => (
+          {(scenario.assertionDefinitions || []).map((a: any) => (
             <div
-              key={assertion.id}
+              key={a.id}
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: 12,
+                justifyContent: 'space-between',
                 padding: '10px 14px',
                 border: '1px solid var(--line)',
                 borderRadius: 'var(--radius-sm)',
                 fontSize: 13
               }}
             >
-              <CheckCircle2 size={16} color="var(--accent)" />
-              <div style={{ flex: 1 }}>
-                <strong style={{ color: 'var(--ink)' }}>{assertion.label}</strong>
-                <span style={{ color: 'var(--ink-secondary)', marginLeft: 8 }}>— {assertion.description}</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <CheckCircle2 size={15} color="var(--ink-muted)" />
+                <span style={{ fontWeight: 500, color: 'var(--ink)' }}>{a.label}</span>
               </div>
+              <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--ink-muted)' }}>
+                Target: {a.target}
+              </span>
             </div>
           ))}
         </div>

@@ -15,11 +15,10 @@ import {
 } from 'lucide-react';
 
 interface RunDetailPageProps {
-  mode: 'LOCAL_OPERATOR' | 'PUBLIC_VIEWER';
-  isOperator: boolean;
+  mode?: 'LOCAL_OPERATOR' | 'PUBLIC_VIEWER';
 }
 
-export default function RunDetailPage({ isOperator }: RunDetailPageProps) {
+export default function RunDetailPage({ mode }: RunDetailPageProps) {
   const { runId } = useParams<{ runId: string }>();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<'evidence' | 'measurements' | 'recovery'>('evidence');
@@ -122,10 +121,10 @@ export default function RunDetailPage({ isOperator }: RunDetailPageProps) {
             <StatusChip status={run.outcome} variant="outcome" />
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginTop: 8, fontSize: 13, color: 'var(--ink-secondary)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginTop: 8, fontSize: 13, color: 'var(--ink-secondary)', flexWrap: 'wrap' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <Clock size={14} />
-              <span>Created: {new Date(run.createdAt).toLocaleString()}</span>
+              <span>Created: {new Date(run.createdAt).toLocaleString()} {run.provenance === 'recorded_example' ? '(Original Recorded)' : ''}</span>
             </div>
             {run.finishedAt && (
               <div>Finished: {new Date(run.finishedAt).toLocaleTimeString()}</div>
@@ -134,8 +133,8 @@ export default function RunDetailPage({ isOperator }: RunDetailPageProps) {
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          {run.active && isOperator && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          {run.active && mode === 'LOCAL_OPERATOR' && (
             <button
               onClick={() => cancelMutation.mutate()}
               disabled={cancelMutation.isPending}
@@ -175,7 +174,7 @@ export default function RunDetailPage({ isOperator }: RunDetailPageProps) {
             }}
           >
             <Download size={15} />
-            Raw Evidence (.json)
+            Inspect evidence (.json)
           </button>
 
           <Link
@@ -184,9 +183,9 @@ export default function RunDetailPage({ isOperator }: RunDetailPageProps) {
               display: 'inline-flex',
               alignItems: 'center',
               gap: 6,
-              background: 'var(--surface-muted)',
-              border: '1px solid var(--line)',
-              color: 'var(--ink)',
+              background: 'var(--accent)',
+              color: '#ffffff',
+              border: 'none',
               padding: '8px 14px',
               borderRadius: 'var(--radius-sm)',
               fontWeight: 600,
@@ -195,22 +194,21 @@ export default function RunDetailPage({ isOperator }: RunDetailPageProps) {
             }}
           >
             <FileText size={15} />
-            Export Report
+            Download report
           </Link>
         </div>
       </div>
 
       {/* Main Content Grid: Left 8/12, Right 4/12 */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: 24 }}>
+      <div className="overview-hero-grid">
         {/* Left Column: Timeline & Phases */}
-        <div style={{
-          gridColumn: 'span 8',
+        <div className="hero-panel-main" style={{
           background: 'var(--surface)',
           border: '1px solid var(--line)',
           borderRadius: 'var(--radius-md)',
           padding: 24
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
             <h3 style={{ fontSize: 16, fontWeight: 600, color: 'var(--ink)' }}>
               Execution Timeline & Observations
             </h3>
@@ -223,9 +221,10 @@ export default function RunDetailPage({ isOperator }: RunDetailPageProps) {
             {[
               { id: 'all', label: 'All Events' },
               { id: 'tls_probe', label: 'TLS Probes' },
-              { id: 'step_start', label: 'Phase Steps' },
-              { id: 'fault_injected', label: 'Faults' },
-              { id: 'assertion', label: 'Assertions' }
+              { id: 'sample_request', label: 'Sample Requests' },
+              { id: 'phase_started', label: 'Phases' },
+              { id: 'fault_enabled', label: 'Faults' },
+              { id: 'recovery_verified', label: 'Recovery' }
             ].map((f) => (
               <button
                 key={f.id}
@@ -250,8 +249,6 @@ export default function RunDetailPage({ isOperator }: RunDetailPageProps) {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {filteredEvents.map((evt) => {
               const isExpanded = expandedEventId === evt.id;
-              const isProbe = evt.type === 'tls_probe';
-              const isMismatch = evt.data?.mismatchDetected;
 
               return (
                 <div
@@ -260,93 +257,63 @@ export default function RunDetailPage({ isOperator }: RunDetailPageProps) {
                     border: '1px solid var(--line)',
                     borderRadius: 'var(--radius-sm)',
                     overflow: 'hidden',
-                    background: isMismatch ? 'var(--warning-soft)' : 'var(--surface)'
+                    background: 'var(--surface)'
                   }}
                 >
                   <div
                     onClick={() => setExpandedEventId(isExpanded ? null : evt.id)}
                     style={{
                       padding: '10px 14px',
+                      background: isExpanded ? 'var(--surface-muted)' : 'transparent',
+                      cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'space-between',
-                      cursor: 'pointer',
+                      gap: 12,
                       fontSize: 13
                     }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
                       {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-muted)' }}>
+                        #{evt.seq}
+                      </span>
+                      <span style={{ fontWeight: 600, color: 'var(--ink)' }}>
+                        {evt.type}
+                      </span>
+                      {evt.phase && (
+                        <span style={{ fontSize: 11, padding: '1px 6px', borderRadius: 3, background: 'var(--surface-muted)', color: 'var(--ink-secondary)' }}>
+                          {evt.phase}
+                        </span>
+                      )}
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
                       <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-muted)' }}>
                         +{evt.elapsedMs}ms
                       </span>
-                      <span style={{
-                        fontSize: 11,
-                        fontWeight: 600,
-                        padding: '1px 6px',
-                        borderRadius: 3,
-                        background: 'var(--surface-muted)',
-                        color: 'var(--ink-secondary)',
-                        textTransform: 'uppercase'
-                      }}>
-                        {evt.type}
-                      </span>
-                      <strong style={{ color: 'var(--ink)' }}>
-                        {isProbe ? (
-                          <span>
-                            Probe {evt.data.caller} → {evt.data.callee}: {evt.data.success ? 'Authenticated' : 'Rejection'} ({evt.data.durationMs}ms)
-                          </span>
-                        ) : evt.data?.message ? (
-                          evt.data.message
-                        ) : (
-                          `${evt.phase}: ${evt.type}`
-                        )}
-                      </strong>
-                    </div>
-
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      {isProbe && evt.data.certificateFingerprint && (
-                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-secondary)' }}>
-                          fp: {evt.data.certificateFingerprint.slice(0, 10)}...
-                        </span>
-                      )}
-                      <span style={{ fontSize: 11, color: 'var(--ink-muted)' }}>#{evt.seq}</span>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          copyToClipboard(evt.id, evt.id);
+                        }}
+                        title="Copy Event ID"
+                        style={{ background: 'transparent', border: 'none', color: 'var(--ink-muted)', cursor: 'pointer', padding: 2 }}
+                      >
+                        {copiedId === evt.id ? <Check size={12} color="var(--success)" /> : <Copy size={12} />}
+                      </button>
                     </div>
                   </div>
 
                   {isExpanded && (
-                    <div style={{
-                      padding: '12px 16px',
-                      background: 'var(--surface-muted)',
-                      borderTop: '1px solid var(--line)',
-                      fontSize: 12
-                    }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                        <span style={{ fontWeight: 600, color: 'var(--ink-secondary)' }}>Event ID: {evt.id}</span>
-                        <button
-                          onClick={() => copyToClipboard(JSON.stringify(evt.data, null, 2), evt.id)}
-                          style={{
-                            background: 'transparent',
-                            border: 'none',
-                            color: 'var(--accent)',
-                            fontSize: 11,
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 4
-                          }}
-                        >
-                          {copiedId === evt.id ? <Check size={12} /> : <Copy size={12} />}
-                          {copiedId === evt.id ? 'Copied' : 'Copy JSON'}
-                        </button>
-                      </div>
+                    <div style={{ padding: '12px 16px', borderTop: '1px solid var(--line)', background: 'var(--canvas)' }}>
                       <pre style={{
-                        fontFamily: 'var(--font-mono)',
                         fontSize: 11,
-                        background: 'var(--surface)',
-                        padding: 10,
-                        borderRadius: 4,
+                        color: 'var(--ink)',
+                        lineHeight: 1.4,
                         overflowX: 'auto',
-                        border: '1px solid var(--line)'
+                        whiteSpace: 'pre-wrap',
+                        wordBreak: 'break-all'
                       }}>
                         {JSON.stringify(evt.data, null, 2)}
                       </pre>
@@ -359,8 +326,7 @@ export default function RunDetailPage({ isOperator }: RunDetailPageProps) {
         </div>
 
         {/* Right Column: Verification Assertions */}
-        <div style={{
-          gridColumn: 'span 4',
+        <div className="hero-panel-side" style={{
           display: 'flex',
           flexDirection: 'column',
           gap: 24
@@ -389,7 +355,7 @@ export default function RunDetailPage({ isOperator }: RunDetailPageProps) {
                       fontSize: 13
                     }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6, flexWrap: 'wrap', gap: 6 }}>
                       <span style={{ fontWeight: 600, color: 'var(--ink)' }}>{assertion.label}</span>
                       <StatusChip status={assertion.status} variant="assertion" />
                     </div>
@@ -397,6 +363,12 @@ export default function RunDetailPage({ isOperator }: RunDetailPageProps) {
                     <p style={{ fontSize: 12, color: 'var(--ink-secondary)', lineHeight: 1.4 }}>
                       {assertion.explanation}
                     </p>
+
+                    {assertion.actual && (
+                      <div style={{ marginTop: 6, fontSize: 11, color: 'var(--ink)', fontWeight: 500 }}>
+                        Observed: <span className="mono-break">{assertion.actual}</span>
+                      </div>
+                    )}
 
                     {assertion.evidenceEventIds?.length > 0 && (
                       <div style={{ marginTop: 8, fontSize: 11, color: 'var(--ink-muted)' }}>
@@ -422,7 +394,8 @@ export default function RunDetailPage({ isOperator }: RunDetailPageProps) {
           display: 'flex',
           borderBottom: '1px solid var(--line)',
           background: 'var(--surface-muted)',
-          padding: '0 16px'
+          padding: '0 16px',
+          overflowX: 'auto'
         }}>
           <button
             onClick={() => setActiveTab('evidence')}
@@ -433,7 +406,8 @@ export default function RunDetailPage({ isOperator }: RunDetailPageProps) {
               borderBottom: activeTab === 'evidence' ? '2px solid var(--accent)' : '2px solid transparent',
               color: activeTab === 'evidence' ? 'var(--accent)' : 'var(--ink-secondary)',
               fontWeight: 600,
-              fontSize: 13
+              fontSize: 13,
+              whiteSpace: 'nowrap'
             }}
           >
             Evidence Explorer ({filteredEvents.length})
@@ -447,7 +421,8 @@ export default function RunDetailPage({ isOperator }: RunDetailPageProps) {
               borderBottom: activeTab === 'measurements' ? '2px solid var(--accent)' : '2px solid transparent',
               color: activeTab === 'measurements' ? 'var(--accent)' : 'var(--ink-secondary)',
               fontWeight: 600,
-              fontSize: 13
+              fontSize: 13,
+              whiteSpace: 'nowrap'
             }}
           >
             TLS Measurements ({measurements.length})
@@ -461,7 +436,8 @@ export default function RunDetailPage({ isOperator }: RunDetailPageProps) {
               borderBottom: activeTab === 'recovery' ? '2px solid var(--accent)' : '2px solid transparent',
               color: activeTab === 'recovery' ? 'var(--accent)' : 'var(--ink-secondary)',
               fontWeight: 600,
-              fontSize: 13
+              fontSize: 13,
+              whiteSpace: 'nowrap'
             }}
           >
             Recovery Verification
@@ -486,6 +462,7 @@ export default function RunDetailPage({ isOperator }: RunDetailPageProps) {
                 >
                   <option value="all">All Events</option>
                   <option value="tls_probe">tls_probe</option>
+                  <option value="sample_request">sample_request</option>
                   <option value="certificate_issued">certificate_issued</option>
                   <option value="profile_installed">profile_installed</option>
                   <option value="context_reloaded">context_reloaded</option>
@@ -494,30 +471,32 @@ export default function RunDetailPage({ isOperator }: RunDetailPageProps) {
                 </select>
               </div>
 
-              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: 12 }}>
-                <thead>
-                  <tr style={{ background: 'var(--surface-muted)', borderBottom: '1px solid var(--line)', color: 'var(--ink-secondary)' }}>
-                    <th style={{ padding: '8px 12px' }}>Seq</th>
-                    <th style={{ padding: '8px 12px' }}>Type</th>
-                    <th style={{ padding: '8px 12px' }}>Phase</th>
-                    <th style={{ padding: '8px 12px' }}>Service</th>
-                    <th style={{ padding: '8px 12px' }}>Time (+Elapsed)</th>
-                    <th style={{ padding: '8px 12px' }}>Event ID</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredEvents.map((e) => (
-                    <tr key={e.id} style={{ borderBottom: '1px solid var(--line)' }}>
-                      <td style={{ padding: '8px 12px', fontFamily: 'var(--font-mono)' }}>{e.seq}</td>
-                      <td style={{ padding: '8px 12px', fontWeight: 600 }}>{e.type}</td>
-                      <td style={{ padding: '8px 12px' }}>{e.phase}</td>
-                      <td style={{ padding: '8px 12px' }}>{e.serviceId || '—'}</td>
-                      <td style={{ padding: '8px 12px', fontFamily: 'var(--font-mono)' }}>+{e.elapsedMs}ms</td>
-                      <td style={{ padding: '8px 12px', fontFamily: 'var(--font-mono)', color: 'var(--ink-muted)' }}>{e.id}</td>
+              <div className="table-responsive">
+                <table style={{ borderCollapse: 'collapse', textAlign: 'left', fontSize: 12 }}>
+                  <thead>
+                    <tr style={{ background: 'var(--surface-muted)', borderBottom: '1px solid var(--line)', color: 'var(--ink-secondary)' }}>
+                      <th style={{ padding: '8px 12px' }}>Seq</th>
+                      <th style={{ padding: '8px 12px' }}>Type</th>
+                      <th style={{ padding: '8px 12px' }}>Phase</th>
+                      <th style={{ padding: '8px 12px' }}>Service</th>
+                      <th style={{ padding: '8px 12px' }}>Time (+Elapsed)</th>
+                      <th style={{ padding: '8px 12px' }}>Event ID</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {filteredEvents.map((e) => (
+                      <tr key={e.id} style={{ borderBottom: '1px solid var(--line)' }}>
+                        <td style={{ padding: '8px 12px', fontFamily: 'var(--font-mono)' }}>{e.seq}</td>
+                        <td style={{ padding: '8px 12px', fontWeight: 600 }}>{e.type}</td>
+                        <td style={{ padding: '8px 12px' }}>{e.phase}</td>
+                        <td style={{ padding: '8px 12px' }}>{e.serviceId || '—'}</td>
+                        <td style={{ padding: '8px 12px', fontFamily: 'var(--font-mono)' }}>+{e.elapsedMs}ms</td>
+                        <td style={{ padding: '8px 12px', fontFamily: 'var(--font-mono)', color: 'var(--ink-muted)' }}>{e.id}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
 
@@ -526,34 +505,36 @@ export default function RunDetailPage({ isOperator }: RunDetailPageProps) {
               <p style={{ fontSize: 13, color: 'var(--ink-secondary)', marginBottom: 16 }}>
                 Each measurement represents a fresh non-resumed TLS connection with strict chain verification.
               </p>
-              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: 12 }}>
-                <thead>
-                  <tr style={{ background: 'var(--surface-muted)', borderBottom: '1px solid var(--line)', color: 'var(--ink-secondary)' }}>
-                    <th style={{ padding: '8px 12px' }}>Caller → Callee</th>
-                    <th style={{ padding: '8px 12px' }}>Handshake Result</th>
-                    <th style={{ padding: '8px 12px' }}>Latency</th>
-                    <th style={{ padding: '8px 12px' }}>Certificate Fingerprint (SHA-256)</th>
-                    <th style={{ padding: '8px 12px' }}>Trust Profile</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {measurements.map((m) => (
-                    <tr key={m.id} style={{ borderBottom: '1px solid var(--line)' }}>
-                      <td style={{ padding: '8px 12px', fontWeight: 500 }}>
-                        {m.data.caller} → {m.data.callee}
-                      </td>
-                      <td style={{ padding: '8px 12px' }}>
-                        <StatusChip status={m.data.success ? 'Authenticated' : 'Rejected'} />
-                      </td>
-                      <td style={{ padding: '8px 12px', fontFamily: 'var(--font-mono)' }}>{m.data.durationMs}ms</td>
-                      <td style={{ padding: '8px 12px', fontFamily: 'var(--font-mono)', fontSize: 11 }}>
-                        {m.data.certificateFingerprint || '—'}
-                      </td>
-                      <td style={{ padding: '8px 12px' }}>{m.data.trustProfile}</td>
+              <div className="table-responsive">
+                <table style={{ borderCollapse: 'collapse', textAlign: 'left', fontSize: 12 }}>
+                  <thead>
+                    <tr style={{ background: 'var(--surface-muted)', borderBottom: '1px solid var(--line)', color: 'var(--ink-secondary)' }}>
+                      <th style={{ padding: '8px 12px' }}>Caller → Callee</th>
+                      <th style={{ padding: '8px 12px' }}>Handshake Result</th>
+                      <th style={{ padding: '8px 12px' }}>Latency</th>
+                      <th style={{ padding: '8px 12px' }}>Certificate Fingerprint (SHA-256)</th>
+                      <th style={{ padding: '8px 12px' }}>Trust Profile</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {measurements.map((m) => (
+                      <tr key={m.id} style={{ borderBottom: '1px solid var(--line)' }}>
+                        <td style={{ padding: '8px 12px', fontWeight: 500 }}>
+                          {m.data.caller} → {m.data.callee}
+                        </td>
+                        <td style={{ padding: '8px 12px' }}>
+                          <StatusChip status={m.data.success ? 'Authenticated' : 'Rejected'} />
+                        </td>
+                        <td style={{ padding: '8px 12px', fontFamily: 'var(--font-mono)' }}>{m.data.durationMs}ms</td>
+                        <td style={{ padding: '8px 12px', fontFamily: 'var(--font-mono)', fontSize: 11 }} className="mono-break">
+                          {m.data.certificateFingerprint || '—'}
+                        </td>
+                        <td style={{ padding: '8px 12px' }}>{m.data.trustProfile}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
 

@@ -475,8 +475,8 @@ export function createApiRouter(
       });
     }
 
-    // Acquire environment lease
-    const ownerId = `worker-${process.pid}`;
+    const runId = `run-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
+    const ownerId = `worker-${process.pid}-${runId}`;
     const fence = await engine.acquireLease(environmentId, ownerId);
     if (!fence || !controller.validateFence(fence)) {
       return res.status(409).json({
@@ -484,7 +484,6 @@ export function createApiRouter(
       });
     }
 
-    const runId = `run-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
     const now = new Date().toISOString();
 
     const runDoc = await RunModel.create({

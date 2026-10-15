@@ -9,7 +9,7 @@
     "./contracts": "./src/contracts/index.ts"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && node -e \"const fs = require('fs'); fs.mkdirSync('dist/export', { recursive: true }); fs.copyFileSync('src/export/recorded-snapshots.json', 'dist/export/recorded-snapshots.json');\"",
     "typecheck": "tsc --noEmit",
     "dev": "tsx watch src/index.ts",
     "start": "node dist/index.js",

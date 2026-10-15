@@ -19,7 +19,10 @@ describe('Phase 5: Security Hardening & Viewer Mode', () => {
   const testCertDir = path.resolve(__dirname, '../../.tmp/certs-sec-test');
 
   beforeAll(async () => {
-    await connectDb();
+    if (mongoose.connection.readyState !== 0) {
+      await mongoose.disconnect();
+    }
+    await connectDb('mongodb://127.0.0.1:27017/trustrehearsal_test');
     // 1. Viewer app
     viewerApp = express();
     viewerApp.use(express.json());
@@ -30,10 +33,11 @@ describe('Phase 5: Security Hardening & Viewer Mode', () => {
     if (fs.existsSync(testCertDir)) {
       fs.rmSync(testCertDir, { recursive: true, force: true });
     }
-    controller = new LabController({ baseDir: testCertDir });
+    controller = new LabController({ baseDir: testCertDir, ephemeralPorts: true });
     await controller.initialize();
     engine = new RunExecutionEngine(controller);
 
+    process.env.OPERATOR_PASSWORD = 'test-operator-secret';
     operatorApp = express();
     operatorApp.use(express.json());
     operatorApp.use(cookieParser());
@@ -57,14 +61,26 @@ describe('Phase 5: Security Hardening & Viewer Mode', () => {
     expect(res.body.error?.code).toBe('NOT_AUTHENTICATED');
   });
 
-  it('strictly denies mutation with invalid CSRF token', async () => {
+  it('strictly denies mutation with invalid CSRF token on an authenticated session', async () => {
+    // 1. Authenticate to establish valid session
+    const loginRes = await request(operatorApp)
+      .post('/api/v1/operator/session')
+      .send({ password: 'test-operator-secret' });
+
+    expect(loginRes.status).toBe(200);
+    const sessionCookie = loginRes.headers['set-cookie'];
+    expect(sessionCookie).toBeDefined();
+
+    // 2. Perform mutation with valid session but invalid CSRF token
     const res = await request(operatorApp)
       .post('/api/v1/runs')
-      .set('Cookie', ['trust_session=dummy-session-id'])
-      .set('X-CSRF-Token', 'invalid-token')
+      .set('Cookie', sessionCookie)
+      .set('X-CSRF-Token', 'tampered-invalid-csrf-token')
       .send({ environmentId: 'sample-lab', scenarioId: 'S01' });
 
-    expect(res.status).toBe(401);
+    expect(res.status).toBe(403);
+    expect(res.body.error?.code).toBe('FORBIDDEN');
+    expect(res.body.error?.message).toContain('CSRF');
   });
 
   it('strictly denies all mutation routes in PUBLIC_VIEWER mode with LIVE_DISABLED', async () => {

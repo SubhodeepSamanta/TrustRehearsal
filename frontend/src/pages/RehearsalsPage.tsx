@@ -3,7 +3,11 @@ import { useQuery } from '@tanstack/react-query';
 import { apiFetch } from '../api/client.js';
 import { ArrowRight, ShieldCheck, ShieldAlert, GitCommit } from 'lucide-react';
 
-export default function RehearsalsPage() {
+interface RehearsalsPageProps {
+  mode?: 'LOCAL_OPERATOR' | 'PUBLIC_VIEWER';
+}
+
+export default function RehearsalsPage({ mode: _mode }: RehearsalsPageProps) {
   const { data: scenarios, isLoading } = useQuery({
     queryKey: ['scenarios'],
     queryFn: () => apiFetch<any[]>('/scenarios')
@@ -46,7 +50,7 @@ export default function RehearsalsPage() {
                 gap: 16
               }}
             >
-              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
                 <div style={{ display: 'flex', gap: 14 }}>
                   <div style={{
                     width: 36,
@@ -78,18 +82,18 @@ export default function RehearsalsPage() {
                     display: 'inline-flex',
                     alignItems: 'center',
                     gap: 6,
-                    background: 'var(--surface-muted)',
-                    border: '1px solid var(--line)',
-                    padding: '8px 14px',
+                    background: 'var(--accent)',
+                    color: '#ffffff',
+                    border: 'none',
+                    padding: '8px 16px',
                     borderRadius: 'var(--radius-sm)',
                     fontSize: 13,
                     fontWeight: 600,
-                    color: 'var(--ink)',
                     textDecoration: 'none',
                     whiteSpace: 'nowrap'
                   }}
                 >
-                  Configure & Run <ArrowRight size={14} />
+                  Explore rehearsal <ArrowRight size={14} />
                 </Link>
               </div>
 
@@ -100,12 +104,13 @@ export default function RehearsalsPage() {
                 paddingTop: 14,
                 borderTop: '1px solid var(--line)',
                 fontSize: 12,
-                color: 'var(--ink-secondary)'
+                color: 'var(--ink-secondary)',
+                flexWrap: 'wrap'
               }}>
-                <div>Phases: <strong>{s.phasesCount}</strong></div>
-                <div>Assertions: <strong>{s.assertionsCount}</strong></div>
-                <div>Max Duration: <strong>{s.maxDurationMs / 1000}s</strong></div>
-                <div>Expected Faults: <strong>{s.expectedFaults?.join(', ') || 'none'}</strong></div>
+                <div>Phases: <strong>{s.phasesCount || s.phaseDefinitions?.length || 6}</strong></div>
+                <div>Assertions: <strong>{s.assertionsCount || s.assertionDefinitions?.length || 5}</strong></div>
+                <div>Max Duration: <strong>{(s.maxDurationMs || 30000) / 1000}s</strong></div>
+                <div>Expected Faults: <strong>{s.expectedFaults?.join(', ') || 'Controlled TLS mutation'}</strong></div>
               </div>
             </div>
           );

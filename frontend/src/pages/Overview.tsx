@@ -2,15 +2,14 @@ import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { apiFetch } from '../api/client.js';
 import StatusChip from '../components/StatusChip.js';
-import { Play, ArrowRight, CheckCircle, Network, Clock } from 'lucide-react';
+import { ArrowRight, CheckCircle, Network, Clock, GitCompare } from 'lucide-react';
 
 interface OverviewProps {
   mode: 'LOCAL_OPERATOR' | 'PUBLIC_VIEWER';
   isOperator?: boolean;
-  onOpenStartModal?: () => void;
 }
 
-export default function Overview({ mode }: OverviewProps) {
+export default function Overview({ mode: _mode }: OverviewProps) {
   const { data: runsData, isLoading: runsLoading } = useQuery({
     queryKey: ['runs', 10],
     queryFn: () => apiFetch<{ runs: any[] }>('/runs?limit=10')
@@ -60,55 +59,52 @@ export default function Overview({ mode }: OverviewProps) {
           </p>
         </div>
 
-        <div>
-          {mode === 'LOCAL_OPERATOR' ? (
-            <Link
-              to="/rehearsals/S01"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 8,
-                background: 'var(--accent)',
-                color: '#ffffff',
-                padding: '10px 18px',
-                borderRadius: 'var(--radius-sm)',
-                fontWeight: 600,
-                fontSize: 13,
-                textDecoration: 'none'
-              }}
-            >
-              <Play size={15} fill="#ffffff" />
-              Start rehearsal
-            </Link>
-          ) : (
-            <Link
-              to={latestRun ? `/runs/${latestRun.id}` : '/rehearsals'}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 8,
-                background: 'var(--surface)',
-                color: 'var(--ink)',
-                border: '1px solid var(--line)',
-                padding: '10px 18px',
-                borderRadius: 'var(--radius-sm)',
-                fontWeight: 600,
-                fontSize: 13,
-                textDecoration: 'none'
-              }}
-            >
-              Explore recorded run
-              <ArrowRight size={15} />
-            </Link>
-          )}
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          <Link
+            to="/compare"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 8,
+              background: 'var(--surface)',
+              color: 'var(--ink)',
+              border: '1px solid var(--line)',
+              padding: '10px 18px',
+              borderRadius: 'var(--radius-sm)',
+              fontWeight: 600,
+              fontSize: 13,
+              textDecoration: 'none'
+            }}
+          >
+            <GitCompare size={15} />
+            Compare runs
+          </Link>
+
+          <Link
+            to={latestRun ? `/runs/${latestRun.id}` : '/rehearsals'}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 8,
+              background: 'var(--accent)',
+              color: '#ffffff',
+              padding: '10px 18px',
+              borderRadius: 'var(--radius-sm)',
+              fontWeight: 600,
+              fontSize: 13,
+              textDecoration: 'none'
+            }}
+          >
+            Explore rehearsal
+            <ArrowRight size={15} />
+          </Link>
         </div>
       </div>
 
       {/* Hero Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: 24 }}>
+      <div className="overview-hero-grid">
         {/* Main Panel: Latest Result */}
-        <div style={{
-          gridColumn: 'span 8',
+        <div className="hero-panel-main" style={{
           background: 'var(--surface)',
           border: '1px solid var(--line)',
           borderRadius: 'var(--radius-md)',
@@ -118,7 +114,7 @@ export default function Overview({ mode }: OverviewProps) {
           justifyContent: 'space-between'
         }}>
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
               <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-muted)', textTransform: 'uppercase' }}>
                 Latest Rehearsal Result
               </span>
@@ -133,16 +129,20 @@ export default function Overview({ mode }: OverviewProps) {
             {latestRun ? (
               <div>
                 <h3 style={{ fontSize: 18, fontWeight: 600, color: 'var(--ink)', marginBottom: 8 }}>
-                  {latestRun.scenarioId}: Renewal without application reload
+                  {latestRun.scenarioId}: {scenarios.find(s => s.id === latestRun.scenarioId)?.title || 'Cryptographic Rehearsal'}
                 </h3>
                 <p style={{ fontSize: 13, color: 'var(--ink-secondary)', lineHeight: 1.5 }}>
-                  Observed served certificate differed from newly installed disk certificate before reload. In-memory TLS context reload successfully updated served fingerprint without process restart.
+                  {latestRun.scenarioId === 'S01'
+                    ? 'Observed leaf certificate differed from active serving TLS context before reload. In-memory TLS context reload successfully updated the served fingerprint without dropping service connections.'
+                    : latestRun.scenarioId === 'S02'
+                    ? 'Simulated CA proxy network partition. Data-plane requests continued uninterrupted while certificate renewal attempts failed predictably and safely.'
+                    : 'Evaluated trust root migration. Abrupt leaf transition strictly rejected by Root A callers, while staged dual-trust bundle enabled seamless zero-downtime rollover.'}
                 </p>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: 20, marginTop: 20, fontSize: 13 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 20, marginTop: 20, fontSize: 13, flexWrap: 'wrap' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--ink-secondary)' }}>
                     <Clock size={15} />
-                    <span>{new Date(latestRun.createdAt).toLocaleTimeString()} UTC</span>
+                    <span>{new Date(latestRun.createdAt).toLocaleString()} {latestRun.provenance === 'recorded_example' ? '(Original Recorded)' : ''}</span>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--success)' }}>
                     <CheckCircle size={15} />
@@ -152,7 +152,7 @@ export default function Overview({ mode }: OverviewProps) {
               </div>
             ) : (
               <div style={{ padding: '32px 0', textAlign: 'center', color: 'var(--ink-muted)' }}>
-                No rehearsals executed yet. Start with S01 certificate reload validation.
+                No rehearsals executed yet. Select a scenario below to explore rehearsal details.
               </div>
             )}
           </div>
@@ -163,15 +163,14 @@ export default function Overview({ mode }: OverviewProps) {
                 to={`/runs/${latestRun.id}`}
                 style={{ fontSize: 13, fontWeight: 600, color: 'var(--accent)', display: 'inline-flex', alignItems: 'center', gap: 6 }}
               >
-                Inspect full timeline and TLS evidence <ArrowRight size={14} />
+                Inspect evidence <ArrowRight size={14} />
               </Link>
             </div>
           )}
         </div>
 
         {/* Side Panel: Environment Health */}
-        <div style={{
-          gridColumn: 'span 4',
+        <div className="hero-panel-side" style={{
           background: 'var(--surface)',
           border: '1px solid var(--line)',
           borderRadius: 'var(--radius-md)',
@@ -195,7 +194,7 @@ export default function Overview({ mode }: OverviewProps) {
               Topology of 3 sample services with dedicated Root CAs. Controlled fault injection with strict TLS verification.
             </p>
 
-            <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 8, fontSize: 12 }}>
+            <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 8, fontSize: 12 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--ink-secondary)' }}>
                 <span>Active Services:</span>
                 <strong style={{ color: 'var(--ink)' }}>gateway, orders, ledger</strong>
@@ -209,9 +208,22 @@ export default function Overview({ mode }: OverviewProps) {
                 <strong style={{ color: 'var(--ink)' }}>{envData?.baselineProfile || 'A0'}</strong>
               </div>
             </div>
+
+            <div style={{
+              marginTop: 14,
+              padding: '10px 12px',
+              background: 'var(--surface-muted)',
+              border: '1px solid var(--line)',
+              borderRadius: 'var(--radius-sm)',
+              fontSize: 11,
+              color: 'var(--ink-secondary)',
+              lineHeight: 1.4
+            }}>
+              <strong style={{ color: 'var(--ink)' }}>Distinction Note:</strong> Topology services remain healthy (green status) while rehearsal outcomes test and prove intentional TLS trust boundaries.
+            </div>
           </div>
 
-          <div style={{ marginTop: 24, paddingTop: 16, borderTop: '1px solid var(--line)' }}>
+          <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--line)' }}>
             <Link
               to="/environment"
               style={{ fontSize: 13, fontWeight: 600, color: 'var(--accent)', display: 'inline-flex', alignItems: 'center', gap: 6 }}
@@ -233,7 +245,7 @@ export default function Overview({ mode }: OverviewProps) {
           </p>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 16 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
           {scenarios.map((scenario) => (
             <Link
               key={scenario.id}
@@ -277,7 +289,7 @@ export default function Overview({ mode }: OverviewProps) {
               </div>
 
               <div style={{ marginTop: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 12, fontWeight: 600, color: 'var(--accent)' }}>
-                <span>Review scenario plan</span>
+                <span>Explore rehearsal</span>
                 <ArrowRight size={14} />
               </div>
             </Link>
@@ -292,54 +304,61 @@ export default function Overview({ mode }: OverviewProps) {
         borderRadius: 'var(--radius-md)',
         overflow: 'hidden'
       }}>
-        <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--line)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--line)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
           <h3 style={{ fontSize: 15, fontWeight: 600, color: 'var(--ink)' }}>
             Recent Rehearsal Activity
           </h3>
-          <Link to="/runs" style={{ fontSize: 13, fontWeight: 600, color: 'var(--accent)' }}>
-            View all runs
-          </Link>
+          <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+            <Link to="/compare" style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-secondary)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+              <GitCompare size={13} /> Compare runs
+            </Link>
+            <Link to="/runs" style={{ fontSize: 13, fontWeight: 600, color: 'var(--accent)' }}>
+              View all runs
+            </Link>
+          </div>
         </div>
 
         {runsLoading ? (
           <div style={{ padding: 24, textAlign: 'center', color: 'var(--ink-muted)' }}>Loading runs...</div>
         ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: 13 }}>
-            <thead>
-              <tr style={{ background: 'var(--surface-muted)', borderBottom: '1px solid var(--line)', color: 'var(--ink-secondary)' }}>
-                <th style={{ padding: '10px 20px', fontWeight: 600 }}>Run ID</th>
-                <th style={{ padding: '10px 20px', fontWeight: 600 }}>Scenario</th>
-                <th style={{ padding: '10px 20px', fontWeight: 600 }}>Provenance</th>
-                <th style={{ padding: '10px 20px', fontWeight: 600 }}>Lifecycle</th>
-                <th style={{ padding: '10px 20px', fontWeight: 600 }}>Outcome</th>
-                <th style={{ padding: '10px 20px', fontWeight: 600 }}>Time</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(runsData?.runs || []).slice(0, 5).map((run) => (
-                <tr key={run.id} style={{ borderBottom: '1px solid var(--line)' }}>
-                  <td style={{ padding: '12px 20px' }}>
-                    <Link to={`/runs/${run.id}`} style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>
-                      {run.id}
-                    </Link>
-                  </td>
-                  <td style={{ padding: '12px 20px', fontWeight: 500 }}>{run.scenarioId}</td>
-                  <td style={{ padding: '12px 20px' }}>
-                    <StatusChip status={run.provenance === 'live_lab' ? 'Live lab' : 'Recorded'} />
-                  </td>
-                  <td style={{ padding: '12px 20px' }}>
-                    <StatusChip status={run.lifecycle} />
-                  </td>
-                  <td style={{ padding: '12px 20px' }}>
-                    <StatusChip status={run.outcome} variant="outcome" />
-                  </td>
-                  <td style={{ padding: '12px 20px', color: 'var(--ink-muted)' }}>
-                    {new Date(run.createdAt).toLocaleString()}
-                  </td>
+          <div className="table-responsive">
+            <table style={{ borderCollapse: 'collapse', textAlign: 'left', fontSize: 13 }}>
+              <thead>
+                <tr style={{ background: 'var(--surface-muted)', borderBottom: '1px solid var(--line)', color: 'var(--ink-secondary)' }}>
+                  <th style={{ padding: '10px 20px', fontWeight: 600 }}>Run ID</th>
+                  <th style={{ padding: '10px 20px', fontWeight: 600 }}>Scenario</th>
+                  <th style={{ padding: '10px 20px', fontWeight: 600 }}>Provenance</th>
+                  <th style={{ padding: '10px 20px', fontWeight: 600 }}>Lifecycle</th>
+                  <th style={{ padding: '10px 20px', fontWeight: 600 }}>Outcome</th>
+                  <th style={{ padding: '10px 20px', fontWeight: 600 }}>Execution Time</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {(runsData?.runs || []).slice(0, 5).map((run) => (
+                  <tr key={run.id} style={{ borderBottom: '1px solid var(--line)' }}>
+                    <td style={{ padding: '12px 20px' }}>
+                      <Link to={`/runs/${run.id}`} style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>
+                        {run.id}
+                      </Link>
+                    </td>
+                    <td style={{ padding: '12px 20px', fontWeight: 500 }}>{run.scenarioId}</td>
+                    <td style={{ padding: '12px 20px' }}>
+                      <StatusChip status={run.provenance === 'live_lab' ? 'Live lab' : 'Recorded'} />
+                    </td>
+                    <td style={{ padding: '12px 20px' }}>
+                      <StatusChip status={run.lifecycle} />
+                    </td>
+                    <td style={{ padding: '12px 20px' }}>
+                      <StatusChip status={run.outcome} variant="outcome" />
+                    </td>
+                    <td style={{ padding: '12px 20px', color: 'var(--ink-muted)' }}>
+                      {new Date(run.createdAt).toLocaleString()}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
     </div>

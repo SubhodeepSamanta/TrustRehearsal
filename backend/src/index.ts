@@ -1,19 +1,42 @@
 import express from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
+import path from 'path';
+import fs from 'fs';
 import dotenv from 'dotenv';
-import { DeploymentModeSchema } from './contracts/index.js';
+import { DeploymentModeSchema, DeploymentMode } from './contracts/index.js';
 import { connectDb, seedEnvironmentAndScenarios } from './db/connection.js';
+import { RunModel, LeaseModel, EnvironmentModel } from './db/models.js';
 import { LabController } from './lab/controller.js';
 import { RunExecutionEngine } from './worker/engine.js';
 import { createApiRouter } from './api/routes.js';
 
+// Load root .env file explicitly
+const rootEnvPath = path.resolve(process.cwd(), '../.env');
+if (fs.existsSync(rootEnvPath)) {
+  dotenv.config({ path: rootEnvPath });
+} else {
+  const localRootEnv = path.resolve(process.cwd(), '.env');
+  if (fs.existsSync(localRootEnv)) {
+    dotenv.config({ path: localRootEnv });
+  }
+}
 dotenv.config();
 
 const app = express();
 const port = parseInt(process.env.PORT || '4000', 10);
 const host = process.env.HOST || '127.0.0.1';
-const mode = DeploymentModeSchema.catch('LOCAL_OPERATOR').parse(process.env.MODE);
+
+// Strict validation of deployment mode (no silent fallback on invalid input)
+const rawMode = process.env.MODE || 'LOCAL_OPERATOR';
+const modeParse = DeploymentModeSchema.safeParse(rawMode);
+if (!modeParse.success) {
+  console.error(`[Fatal Configuration Error] Invalid deployment MODE="${rawMode}". Expected 'LOCAL_OPERATOR' or 'PUBLIC_VIEWER'.`);
+  if (process.env.NODE_ENV !== 'test') {
+    process.exit(1);
+  }
+}
+const mode: DeploymentMode = modeParse.success ? modeParse.data : 'LOCAL_OPERATOR';
 
 app.use(cors({
   origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
@@ -39,6 +62,39 @@ export async function bootstrapApp(): Promise<express.Application> {
   await controller.initialize();
 
   engine = new RunExecutionEngine(controller);
+
+  // Startup reconciliation: clean up any abandoned active runs from crashes or hard interrupts
+  try {
+    const abandoned = await RunModel.find({ active: true });
+    for (const run of abandoned) {
+      await RunModel.updateOne(
+        { _id: run._id },
+        {
+          $set: {
+            lifecycle: 'interrupted',
+            outcome: 'inconclusive',
+            active: false,
+            finishedAt: new Date().toISOString()
+          }
+        }
+      );
+    }
+
+    // Release dangling leases
+    await LeaseModel.updateMany(
+      { $or: [{ expiresAt: { $lt: new Date() } }, { ownerId: { $ne: 'unclaimed' } }] },
+      { $set: { ownerId: 'unclaimed', expiresAt: new Date(0) } }
+    );
+
+    // Reconcile and verify baseline environment
+    await controller.resetToBaseline();
+    await EnvironmentModel.updateOne(
+      { id: 'sample-lab' },
+      { $set: { state: 'ready', activeRunId: null } }
+    );
+  } catch (err) {
+    console.warn('[Startup Reconciliation] Warning during baseline reconciliation:', err);
+  }
 
   const apiRouter = createApiRouter(mode, engine, controller);
   app.use('/api/v1', apiRouter);

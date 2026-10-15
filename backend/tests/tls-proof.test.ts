@@ -12,7 +12,7 @@ describe('Phase 1: Real TLS Proof', () => {
     if (fs.existsSync(testCertDir)) {
       fs.rmSync(testCertDir, { recursive: true, force: true });
     }
-    controller = new LabController({ baseDir: testCertDir });
+    controller = new LabController({ baseDir: testCertDir, ephemeralPorts: true });
     await controller.initialize();
   });
 
@@ -27,11 +27,12 @@ describe('Phase 1: Real TLS Proof', () => {
     const ordersA0 = controller.certStore.loadProfile('orders', 'A0');
     expect(ordersA0).toBeDefined();
     const a0Fingerprint = ordersA0!.fingerprint;
+    const ordersPort = controller.getServicePort('orders');
 
     // 1. Initial probe of orders: must observe A0
     const probe1 = await executeTlsProbe({
       host: '127.0.0.1',
-      port: 8444,
+      port: ordersPort,
       servername: 'orders',
       caCertPem: controller.certStore.rootA.certPem,
       caller: 'gateway',
@@ -53,7 +54,7 @@ describe('Phase 1: Real TLS Proof', () => {
     // 4. Probe orders again: server is still serving A0
     const probe2 = await executeTlsProbe({
       host: '127.0.0.1',
-      port: 8444,
+      port: ordersPort,
       servername: 'orders',
       caCertPem: controller.certStore.rootA.certPem,
       caller: 'gateway',
@@ -73,7 +74,7 @@ describe('Phase 1: Real TLS Proof', () => {
     // 6. Probe orders: now serving A1
     const probe3 = await executeTlsProbe({
       host: '127.0.0.1',
-      port: 8444,
+      port: ordersPort,
       servername: 'orders',
       caCertPem: controller.certStore.rootA.certPem,
       caller: 'gateway',
@@ -89,7 +90,7 @@ describe('Phase 1: Real TLS Proof', () => {
 
     const probe4 = await executeTlsProbe({
       host: '127.0.0.1',
-      port: 8444,
+      port: ordersPort,
       servername: 'orders',
       caCertPem: controller.certStore.rootA.certPem,
       caller: 'gateway',
@@ -102,10 +103,11 @@ describe('Phase 1: Real TLS Proof', () => {
   });
 
   it('rejects connection when untrusted CA is provided (strict negative control)', async () => {
+    const ordersPort = controller.getServicePort('orders');
     // Orders serves A-issued certificate. Probe with Root B only.
     const probeUntrusted = await executeTlsProbe({
       host: '127.0.0.1',
-      port: 8444,
+      port: ordersPort,
       servername: 'orders',
       caCertPem: controller.certStore.rootB.certPem, // Wrong root!
       caller: 'gateway',

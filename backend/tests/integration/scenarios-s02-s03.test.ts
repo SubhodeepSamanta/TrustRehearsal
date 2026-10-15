@@ -5,7 +5,7 @@ import mongoose from 'mongoose';
 import { connectDb, seedEnvironmentAndScenarios } from '../../src/db/connection.js';
 import { LabController } from '../../src/lab/controller.js';
 import { RunExecutionEngine } from '../../src/worker/engine.js';
-import { RunModel, RunEventModel } from '../../src/db/models.js';
+import { RunModel, RunEventModel, LeaseModel } from '../../src/db/models.js';
 
 describe('Phase 4: S02, S03 Scenarios and Repetitions', () => {
   const testCertDir = path.resolve(__dirname, '../../.tmp/certs-scenarios-test');
@@ -16,10 +16,15 @@ describe('Phase 4: S02, S03 Scenarios and Repetitions', () => {
     if (fs.existsSync(testCertDir)) {
       fs.rmSync(testCertDir, { recursive: true, force: true });
     }
-    await connectDb();
+    if (mongoose.connection.readyState !== 0) {
+      await mongoose.disconnect();
+    }
+    await connectDb('mongodb://127.0.0.1:27017/trustrehearsal_test');
+    await RunModel.updateMany({ active: true }, { $set: { active: false } });
+    await LeaseModel.deleteMany({});
     await seedEnvironmentAndScenarios();
 
-    controller = new LabController({ baseDir: testCertDir });
+    controller = new LabController({ baseDir: testCertDir, ephemeralPorts: true });
     await controller.initialize();
     engine = new RunExecutionEngine(controller);
   });
@@ -85,7 +90,7 @@ describe('Phase 4: S02, S03 Scenarios and Repetitions', () => {
     expect(finished).toBeDefined();
     expect(finished!.lifecycle).toBe('completed');
     expect(finished!.outcome).toBe('pass');
-    expect(finished!.assertionResults.length).toBe(4);
+    expect(finished!.assertionResults.length).toBe(5);
 
     // Verify negative control assertion passed
     const negControl = finished!.assertionResults.find((a: any) => a.id === 'A01_abrupt_switch_rejected');
@@ -93,7 +98,7 @@ describe('Phase 4: S02, S03 Scenarios and Repetitions', () => {
     expect(negControl.status).toBe('pass');
 
     // Verify dual trust assertion passed
-    const dualTrust = finished!.assertionResults.find((a: any) => a.id === 'A02_dual_trust_accepted_both');
+    const dualTrust = finished!.assertionResults.find((a: any) => a.id === 'A02_dual_trust_established' || a.id === 'A02_dual_trust_accepted_both');
     expect(dualTrust).toBeDefined();
     expect(dualTrust.status).toBe('pass');
   });

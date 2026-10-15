@@ -6,7 +6,7 @@ import { connectDb, seedEnvironmentAndScenarios } from '../../src/db/connection.
 import { LabController } from '../../src/lab/controller.js';
 import { RunExecutionEngine } from '../../src/worker/engine.js';
 import { createApiRouter } from '../../src/api/routes.js';
-import { RunModel, RunEventModel } from '../../src/db/models.js';
+import { RunModel, RunEventModel, LeaseModel } from '../../src/db/models.js';
 import { ReportSchema } from '../../src/contracts/index.js';
 
 describe('Phase 2: Durable Run Backend & API Integration', () => {
@@ -19,10 +19,15 @@ describe('Phase 2: Durable Run Backend & API Integration', () => {
     if (fs.existsSync(testCertDir)) {
       fs.rmSync(testCertDir, { recursive: true, force: true });
     }
-    await connectDb();
+    if (mongoose.connection.readyState !== 0) {
+      await mongoose.disconnect();
+    }
+    await connectDb('mongodb://127.0.0.1:27017/trustrehearsal_test');
+    await RunModel.updateMany({ active: true }, { $set: { active: false } });
+    await LeaseModel.deleteMany({});
     await seedEnvironmentAndScenarios();
 
-    controller = new LabController({ baseDir: testCertDir });
+    controller = new LabController({ baseDir: testCertDir, ephemeralPorts: true });
     await controller.initialize();
 
     engine = new RunExecutionEngine(controller);

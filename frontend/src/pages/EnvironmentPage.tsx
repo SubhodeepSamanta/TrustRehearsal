@@ -6,10 +6,10 @@ import StatusChip from '../components/StatusChip.js';
 import { RotateCcw, CheckCircle, AlertTriangle } from 'lucide-react';
 
 interface EnvironmentPageProps {
-  isOperator: boolean;
+  mode?: 'LOCAL_OPERATOR' | 'PUBLIC_VIEWER';
 }
 
-export default function EnvironmentPage({ isOperator }: EnvironmentPageProps) {
+export default function EnvironmentPage({ mode }: EnvironmentPageProps) {
   const queryClient = useQueryClient();
   const [resetMessage, setResetMessage] = useState<string | null>(null);
 
@@ -58,7 +58,7 @@ export default function EnvironmentPage({ isOperator }: EnvironmentPageProps) {
           </p>
         </div>
 
-        {isOperator && (
+        {mode === 'LOCAL_OPERATOR' && (
           <button
             onClick={() => resetMutation.mutate()}
             disabled={resetMutation.isPending || env.state === 'reserved'}

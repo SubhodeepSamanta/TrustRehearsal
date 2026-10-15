@@ -136,19 +136,28 @@ All planned phases complete. Application ready for local operator execution and 
   - `docs/04-architecture.md`: Updated repository target reflecting `frontend/` and `backend/` folder separation.
   - `docs/PROGRESS.md`: Complete audit of all 6 completed phases.
 - Commands and results:
-### Final Review, Hardening & UX Polish — 15 October 2026
+### Phase 7 — Final Repair & Presentation Pass (Independent Review Resolution) — 15 October 2026
 
 - Status: complete.
 - Changes:
-  - `frontend/src/pages/ComparePage.tsx`: Upgraded with dynamic run selectors (Run A and Run B pickers), Run A/B swap control, side-by-side run header cards, and a comprehensive assertion comparison matrix highlighting identical vs divergent outcomes.
-  - `frontend/src/pages/RunsPage.tsx`: Added scenario filter pills (All, S01, S02, S03) and instant text search across Run ID and outcome.
-  - `frontend/src/pages/RunDetailPage.tsx`: Added interactive event type filters (TLS Probes, Phase Steps, Faults, Assertions), filtered timeline view, and raw formatted evidence JSON download button (`trustrehearsal-[id]-evidence.json`).
-  - `frontend/src/components/Navigation.tsx`: Integrated live API health status pulse polling `/health` with visual green/red indicator.
-  - `frontend/package.json`: Added workspace test script integration to root `npm run test`.
+  - **Zero Login / Credential-Free CEO Experience**: Completely removed sign-in buttons, login modals, operator password forms, and auth barriers from the entire viewer and navigation UI. Visitors open directly to the overview, explore rehearsals, inspect evidence, compare runs, and download reports with zero setup.
+  - **Recovery Evaluation & Cancellation Bounds**: Replaced unconditional passing baseline assertions with post-execution verification requiring positive probe counts and real application traffic (`sample_request`). Cancellation halts new mutations immediately before subsequent operations; cleanup runs in its own bounded context.
+  - **Authenticated Management & Bounded Payloads**: Protected internal `/mgmt/*` endpoints with Bearer token authentication validated against `LAB_CONTROLLER_SECRET`.
+  - **Real End-to-End Application Trust Path**: Wired HTTPS application requests across `gateway -> orders -> ledger` with strict caller trust bundles and explicit SNI.
+  - **Lease Ownership & Fencing**: Generated per-run worker lease IDs (`worker-${process.pid}-${runId}`) to eliminate same-owner lease re-acquisition collisions; conditional lease release on both owner and fence.
+  - **S02 Real CA Proxy Route**: Mounted a dedicated local loopback HTTP CA proxy server (port 18440 in live lab, ephemeral in tests) simulating genuine 502 Bad Gateway partition errors during network outages.
+  - **Test Isolation & Ephemeral Ports**: Added `ephemeralPorts: true` to `LabController` for dynamic port binding (port 0) and isolated integration tests to `trustrehearsal_test` database.
+  - **Static Viewer Adapter Fallback**: `frontend/src/api/client.ts` automatically falls back to `/data/snapshots.json` if backend is offline or deployed as static viewer. Returns honest 404 for unknown run and scenario IDs.
+  - **Responsive Mobile Layout & Accessibility**: Eliminated 390px mobile viewport blowout by converting navigation to a collapsible mobile top header, wrapping tables in horizontal scroll containers (`.table-responsive`), and breaking long SHA-256 fingerprints with `.mono-break`. Added full WAI-ARIA dialog attributes and Escape key handling to modal components.
+  - **Comparison Engine**: Added scenario compatibility checks, warning banners for mismatched scenarios, and actual evidence value comparisons rather than relying solely on pass/fail status.
+  - **Operational Commands**: Upgraded `npm run lab:verify` for non-destructive inspection, `npm run lab:reset` for database/profile resets, and root `npm run dev` with cross-platform `concurrently`.
 - Commands and results:
-  - `npm run lab:verify`: Executed clean direct TLS probes against orders (8444) and ledger (8445) with verified SHA-256 fingerprints.
-  - `npm run test`: 15/15 backend Vitest tests passed across all 5 test files, and frontend typecheck passed with code 0.
+  - Review reproduction script (`reproduce.cjs`): 100% verified passing with all assertions satisfied.
+  - Backend Vitest suite (`npm run test --workspace=backend`): 24/24 tests passed across all 6 test files (`repairs-regression.test.ts`, `runs-and-api.test.ts`, `scenarios-s02-s03.test.ts`, `security-and-viewer.test.ts`, `tls-proof.test.ts`, `contracts.test.ts`).
+  - `npm run lab:verify`: Passed (all 3 live services verified healthy).
+  - `npm run lab:reset`: Successfully reset lab environment to baseline A0 state.
   - `npm run typecheck`: 0 errors across frontend and backend.
-  - `npm run build`: Production bundle built cleanly (backend TypeScript + frontend Vite bundle in 3.38s).
-- Evidence: Full end-to-end automated and manual browser verification passed with 100% green tests.
-- Next action: Goal complete. Release ready.
+  - `npm run build`: Production bundles for backend and frontend built successfully.
+- Evidence: 10 clean canonical runs generated and saved in `backend/src/export/recorded-snapshots.json` and `frontend/public/data/snapshots.json`. Reviewer harness validated `latest-live-report` with 2 real `sample_request` events and full evidence arrays.
+- Decisions/deviations: Public viewer runs with zero authentication barriers or login dialogs per CEO experience requirements.
+
