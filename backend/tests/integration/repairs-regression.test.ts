@@ -10,7 +10,7 @@ import { LabController } from '../../src/lab/controller.js';
 import { RunExecutionEngine } from '../../src/worker/engine.js';
 import { createSnapshotRouter } from '../../src/api/snapshotAdapter.js';
 import { createApiRouter } from '../../src/api/routes.js';
-import { RunModel, LeaseModel, SessionModel, EnvironmentModel } from '../../src/db/models.js';
+import { RunModel, RunEventModel, LeaseModel, SessionModel, EnvironmentModel } from '../../src/db/models.js';
 import { DeploymentModeSchema } from '../../src/contracts/index.js';
 import { SampleServiceInstance } from '../../src/lab/sampleServices.js';
 import { createRootCa, issueLeafCertificate } from '../../src/lab/ca.js';
@@ -288,5 +288,98 @@ describe('Phase 6: Independent Review Repairs Regression Suite', () => {
     }
     expect([200, 201, 202]).toContain(validCsrfRes.status);
     expect(validCsrfRes.body.runId).toBeDefined();
+  });
+
+  it('R16: S03 prevents false pass if ledger remains Root A after pruning', async () => {
+    const isolateController = new LabController({ ephemeralPorts: true });
+    await isolateController.initialize();
+    const isolateEngine = new RunExecutionEngine(isolateController);
+
+    // Sabotage ledger so it is never migrated to Root B
+    const origInstall = isolateController.installProfile.bind(isolateController);
+    isolateController.installProfile = (serviceName, profile, fence) => {
+      if (serviceName === 'ledger') return; // skip migrating ledger
+      origInstall(serviceName, profile, fence);
+    };
+
+    try {
+      const ctx = {
+        runId: `sabotage-s03-${Date.now()}`,
+        environmentId: 'isolated',
+        scenarioId: 'S03' as const,
+        fence: 1,
+        ownerId: 'test',
+        startTime: process.hrtime.bigint(),
+        currentSeq: 0,
+        events: [],
+        cancelled: false
+      };
+
+      const assertions = await isolateEngine.runS03(ctx);
+      const a04 = assertions.find((a) => a.id === 'A04_trust_pruned_to_root_b');
+      expect(a04).toBeDefined();
+      expect(a04!.status).toBe('fail'); // Must FAIL because ledger is still Root A
+    } finally {
+      isolateController.installProfile = origInstall;
+      await isolateController.stop();
+    }
+  });
+
+  it('R17: CA Proxy strictly enforces authentication and network fault', async () => {
+    // 1. Unauthenticated request -> 401
+    const unauthRes = await fetch(`http://127.0.0.1:${controller.caProxyPort}/issue`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ serviceName: 'orders', caName: 'A', profileName: 'test-profile' })
+    });
+    expect(unauthRes.status).toBe(401);
+    const unauthJson: any = await unauthRes.json();
+    expect(unauthJson.error).toBe('UNAUTHORIZED');
+
+    // 2. Authenticated request with fault enabled -> 502 Bad Gateway
+    controller.setIssuanceProxyFault(true);
+    let faultObserved = false;
+    try {
+      await controller.issueNewProfileAsync('orders', 'A', 'fault-test');
+    } catch (e: any) {
+      faultObserved = true;
+      expect(e.message).toContain('HTTP 502 Bad Gateway');
+    } finally {
+      controller.setIssuanceProxyFault(false);
+    }
+    expect(faultObserved).toBe(true);
+
+    // 3. Authenticated request without fault -> 200 OK with signed certificate
+    const validCert = await controller.issueNewProfileAsync('orders', 'A', 'valid-test');
+    expect(validCert.certPem).toBeDefined();
+    expect(validCert.keyPem).toBeDefined();
+    expect(validCert.fingerprint).toBeDefined();
+  });
+
+  it('R18: Event persistence failure does not return successful event ID and interrupts run', async () => {
+    const originalCreate = RunEventModel.create;
+    RunEventModel.create = async () => {
+      throw new Error('Database disk full');
+    };
+
+    try {
+      const ctx = {
+        runId: `fail-persist-${Date.now()}`,
+        environmentId: 'test',
+        scenarioId: 'S01' as const,
+        fence: 1,
+        ownerId: 'test',
+        startTime: process.hrtime.bigint(),
+        currentSeq: 0,
+        events: [],
+        cancelled: false
+      };
+
+      const event = await engine.emitEvent(ctx, 'phase_started', 'test');
+      expect(event.id).toBeNull();
+      expect(ctx.events.length).toBe(0);
+    } finally {
+      RunEventModel.create = originalCreate;
+    }
   });
 });

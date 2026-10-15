@@ -421,6 +421,14 @@ export function createApiRouter(
     const valid = ReportSchema.safeParse(report);
     if (!valid.success) {
       console.error('Report schema validation failed:', valid.error);
+      return res.status(500).json({
+        error: {
+          code: 'INVALID_REPORT',
+          message: 'Generated report failed contract schema validation',
+          requestId: crypto.randomUUID(),
+          details: valid.error.format()
+        }
+      });
     }
 
     res.json(report);
@@ -540,12 +548,27 @@ export function createApiRouter(
     }
 
     await controller.resetToBaseline();
+    const probeRes = await controller.executeApplicationRequest();
+    if (!probeRes.success) {
+      await EnvironmentModel.updateOne(
+        { id: req.params.id },
+        { $set: { state: 'needs_reset', activeRunId: null } }
+      );
+      return res.status(500).json({
+        error: {
+          code: 'RESET_VERIFICATION_FAILED',
+          message: `Baseline reset verification failed: ${probeRes.error || 'Probes unsuccessful'}`,
+          requestId: crypto.randomUUID()
+        }
+      });
+    }
+
     await EnvironmentModel.updateOne(
       { id: req.params.id },
       { $set: { state: 'ready', activeRunId: null, lastVerifiedAt: new Date().toISOString() } }
     );
 
-    res.json({ status: 'reset_verified', environmentId: req.params.id });
+    res.json({ status: 'reset_verified', environmentId: req.params.id, verifiedAt: new Date().toISOString() });
   });
 
   return router;

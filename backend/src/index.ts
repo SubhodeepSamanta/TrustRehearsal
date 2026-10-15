@@ -80,20 +80,36 @@ export async function bootstrapApp(): Promise<express.Application> {
       );
     }
 
-    // Release dangling leases
+    // Release only expired dangling leases
     await LeaseModel.updateMany(
-      { $or: [{ expiresAt: { $lt: new Date() } }, { ownerId: { $ne: 'unclaimed' } }] },
+      { expiresAt: { $lt: new Date() } },
       { $set: { ownerId: 'unclaimed', expiresAt: new Date(0) } }
     );
 
     // Reconcile and verify baseline environment
-    await controller.resetToBaseline();
-    await EnvironmentModel.updateOne(
-      { id: 'sample-lab' },
-      { $set: { state: 'ready', activeRunId: null } }
-    );
+    try {
+      await controller.resetToBaseline();
+      const baseReq = await controller.executeApplicationRequest();
+      if (baseReq.success) {
+        await EnvironmentModel.updateOne(
+          { id: 'sample-lab' },
+          { $set: { state: 'ready', activeRunId: null, lastVerifiedAt: new Date().toISOString() } }
+        );
+      } else {
+        await EnvironmentModel.updateOne(
+          { id: 'sample-lab' },
+          { $set: { state: 'needs_reset', activeRunId: null } }
+        );
+      }
+    } catch (err) {
+      console.warn('[Startup Reconciliation] Baseline reconciliation failed:', err);
+      await EnvironmentModel.updateOne(
+        { id: 'sample-lab' },
+        { $set: { state: 'needs_reset', activeRunId: null } }
+      ).catch(() => {});
+    }
   } catch (err) {
-    console.warn('[Startup Reconciliation] Warning during baseline reconciliation:', err);
+    console.warn('[Startup Reconciliation] Error during startup reconciliation:', err);
   }
 
   const apiRouter = createApiRouter(mode, engine, controller);

@@ -27,6 +27,7 @@ export interface ExecutionContext {
   cancelled: boolean;
   leaseLost?: boolean;
   timedOut?: boolean;
+  persistenceFailed?: boolean;
 }
 
 export interface ProbeEventPair {
@@ -103,10 +104,10 @@ export class RunExecutionEngine {
   }
 
   private isInterrupted(ctx: ExecutionContext): boolean {
-    return ctx.cancelled || !!ctx.leaseLost || !!ctx.timedOut;
+    return ctx.cancelled || !!ctx.leaseLost || !!ctx.timedOut || !!ctx.persistenceFailed;
   }
 
-  private async emitEvent(
+  public async emitEvent(
     ctx: ExecutionContext,
     type: any,
     phase: string,
@@ -132,20 +133,35 @@ export class RunExecutionEngine {
       data
     };
 
-    ctx.events.push(event);
-
-    await RunEventModel.create({
-      eventId,
-      runId: ctx.runId,
-      seq: ctx.currentSeq,
-      type,
-      phase,
-      serviceId,
-      observedAt: now.toISOString(),
-      elapsedMs,
-      operationId,
-      data
-    }).catch(() => {});
+    try {
+      await RunEventModel.create({
+        eventId,
+        runId: ctx.runId,
+        seq: ctx.currentSeq,
+        type,
+        phase,
+        serviceId,
+        observedAt: now.toISOString(),
+        elapsedMs,
+        operationId,
+        data
+      });
+      ctx.events.push(event);
+    } catch (err: any) {
+      ctx.persistenceFailed = true;
+      return {
+        id: null as any,
+        runId: ctx.runId,
+        seq: ctx.currentSeq,
+        type,
+        phase,
+        serviceId,
+        observedAt: now.toISOString(),
+        elapsedMs,
+        operationId,
+        data: { ...data, persistenceError: err?.message || 'Persistence failed' }
+      };
+    }
 
     const subs = this.subscribers.get(ctx.runId);
     if (subs) {
@@ -275,10 +291,13 @@ export class RunExecutionEngine {
         { $set: { lifecycle: 'recovering', phase: 'recovery_reset' } }
       ).catch(() => {});
 
-      // Cleanup context runs independently of experimental cancellation
+      // Cleanup context runs independently of experimental cancellation or timeout
       const cleanupCtx: ExecutionContext = {
         ...ctx,
-        cancelled: false
+        cancelled: false,
+        leaseLost: false,
+        timedOut: false,
+        persistenceFailed: false
       };
 
       try {
@@ -686,6 +705,7 @@ export class RunExecutionEngine {
   public async runS03(ctx: ExecutionContext): Promise<AssertionResult[]> {
     const assertions: AssertionResult[] = [];
     const ordersB0 = this.controller.certStore.loadProfile('orders', 'B0')!;
+    const ledgerB0 = this.controller.certStore.loadProfile('ledger', 'B0')!;
     const rootAPem = this.controller.certStore.rootA.certPem;
     const rootBPem = this.controller.certStore.rootB.certPem;
     const dualTrustPem = `${rootAPem}\n${rootBPem}`;
@@ -777,16 +797,29 @@ export class RunExecutionEngine {
       explanation: 'Services configured with dual trust bundles successfully authenticate existing Root A traffic.'
     });
 
-    // 7. Switch Leaf to Root B Under Dual Trust
+    // 7. Switch Leaves to Root B Under Dual Trust in Callee Dependency Order (ledger, then orders)
     if (this.isInterrupted(ctx)) return assertions;
     await this.emitEvent(ctx, 'phase_started', 'switch_leaf_b');
+
+    // First callee: ledger
+    this.controller.installProfile('ledger', ledgerB0, ctx.fence);
+    this.controller.reloadServiceContext('ledger', ctx.fence);
+    const ledgerSwitchEvt = await this.emitEvent(ctx, 'context_reloaded', 'switch_leaf_b', {
+      service: 'ledger',
+      activeProfile: 'B0'
+    }, 'ledger');
+
+    // Second callee: orders
     this.controller.installProfile('orders', ordersB0, ctx.fence);
     this.controller.reloadServiceContext('orders', ctx.fence);
-    const switchEvt = await this.emitEvent(ctx, 'context_reloaded', 'switch_leaf_b', {
+    const ordersSwitchEvt = await this.emitEvent(ctx, 'context_reloaded', 'switch_leaf_b', {
       service: 'orders',
       activeProfile: 'B0'
     }, 'orders');
-    const switchPairs = await this.collectProbePairs(ctx, 'switch_leaf_b', 5, 'orders', 'dual-trust', dualTrustPem);
+
+    // Probe both callees under dual trust
+    const switchPairsOrders = await this.collectProbePairs(ctx, 'switch_leaf_b', 3, 'orders', 'dual-trust', dualTrustPem);
+    const switchPairsLedger = await this.collectProbePairs(ctx, 'switch_leaf_b', 2, 'ledger', 'dual-trust', dualTrustPem);
     await this.emitEvent(ctx, 'phase_finished', 'switch_leaf_b');
 
     // Execute application request during migration
@@ -802,14 +835,18 @@ export class RunExecutionEngine {
       appReqEvtId = appReqEvt.id;
     }
 
+    const dualSwitchOk = switchPairsOrders.every((p) => p.probe.success) &&
+      switchPairsLedger.every((p) => p.probe.success) &&
+      appReq.success;
+
     assertions.push({
       id: 'A03_leaf_b_accepted_under_dual_trust',
       label: 'Root B leaf certificate accepted without caller disruption',
-      status: switchPairs.every((p) => p.probe.success) && appReq.success ? 'pass' : 'fail',
-      expected: 'Root B leaf certificate accepted by dual-trust callers',
-      actual: `${switchPairs.length} successful probes, end-to-end request: ${appReq.success ? 'PASS' : 'FAIL'}`,
-      evidenceEventIds: [switchEvt.id, ...switchPairs.map((p) => p.eventId), ...(appReqEvtId ? [appReqEvtId] : [])],
-      explanation: 'Application traffic transitioned seamlessly to Root B leaf certificate under dual trust.'
+      status: dualSwitchOk ? 'pass' : 'fail',
+      expected: 'Root B leaf certificates accepted by dual-trust callers for orders and ledger',
+      actual: `${switchPairsOrders.length + switchPairsLedger.length} successful probes, end-to-end request: ${appReq.success ? 'PASS' : 'FAIL'}`,
+      evidenceEventIds: [ordersSwitchEvt.id, ledgerSwitchEvt.id, ...switchPairsOrders.map((p) => p.eventId), ...switchPairsLedger.map((p) => p.eventId), ...(appReqEvtId ? [appReqEvtId] : [])],
+      explanation: 'Application traffic transitioned seamlessly to Root B leaf certificates across orders and ledger under dual trust.'
     });
 
     // 8. Prune Old Trust (Root B only)
@@ -819,19 +856,38 @@ export class RunExecutionEngine {
     this.controller.setServiceTrust('orders', rootBPem, ctx.fence);
     const pruneEvt = await this.emitEvent(ctx, 'profile_installed', 'prune_trust_a', {
       trustProfile: 'root-b-only',
-      message: 'Pruned Root A from trust store'
+      message: 'Pruned Root A from trust store across callers'
     });
-    const finalPairs = await this.collectProbePairs(ctx, 'prune_trust_a', 5, 'orders', 'root-b', rootBPem);
+    const finalPairsOrders = await this.collectProbePairs(ctx, 'prune_trust_a', 3, 'orders', 'root-b', rootBPem);
+    const finalPairsLedger = await this.collectProbePairs(ctx, 'prune_trust_a', 2, 'ledger', 'root-b', rootBPem);
+
+    // Execute real application request AFTER old trust is removed
+    const finalAppReq = await this.controller.executeApplicationRequest();
+    const finalAppEvt = await this.emitEvent(ctx, 'sample_request', 'prune_trust_a', {
+      path: 'gateway -> orders -> ledger',
+      success: finalAppReq.success,
+      statusCode: finalAppReq.statusCode
+    });
+
     await this.emitEvent(ctx, 'phase_finished', 'prune_trust_a');
+
+    const ledgerServing = this.controller.services.get('ledger')?.servingProfile;
+    const ordersServing = this.controller.services.get('orders')?.servingProfile;
+    const ledgerMigrated = ledgerServing?.issuerFingerprint === this.controller.certStore.rootB.fingerprint;
+    const ordersMigrated = ordersServing?.issuerFingerprint === this.controller.certStore.rootB.fingerprint;
+    const allProbesOk = finalPairsOrders.every((p) => p.probe.success) && finalPairsLedger.every((p) => p.probe.success);
+    const migrationSuccess = allProbesOk && finalAppReq.success && finalAppReq.statusCode === 200 && ledgerMigrated && ordersMigrated;
 
     assertions.push({
       id: 'A04_trust_pruned_to_root_b',
       label: 'Retired Root A cleanly pruned leaving Root B active',
-      status: finalPairs.every((p) => p.probe.success) ? 'pass' : 'fail',
-      expected: 'Clean operational state under Root B authority only',
-      actual: `${finalPairs.length} successful probes`,
-      evidenceEventIds: [pruneEvt.id, ...finalPairs.map((p) => p.eventId)],
-      explanation: 'Root rollover completed with Root A safely retired and zero service disruption.'
+      status: migrationSuccess ? 'pass' : 'fail',
+      expected: 'Clean operational state under Root B authority only with verified application path',
+      actual: `${finalPairsOrders.length + finalPairsLedger.length} successful probes, end-to-end request: ${finalAppReq.success ? `PASS (${finalAppReq.statusCode})` : `FAIL (${finalAppReq.statusCode || finalAppReq.error})`}, ledger: ${ledgerMigrated ? 'Root B' : 'Root A'}`,
+      evidenceEventIds: [pruneEvt.id, ...finalPairsOrders.map((p) => p.eventId), ...finalPairsLedger.map((p) => p.eventId), finalAppEvt.id],
+      explanation: migrationSuccess
+        ? 'Root rollover completed with Root A safely retired and verified gateway -> orders -> ledger application flow.'
+        : 'Migration incomplete: callees still serving Root A or end-to-end application request failed under Root B trust.'
     });
 
     return assertions;
