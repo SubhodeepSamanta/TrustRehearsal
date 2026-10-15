@@ -4,11 +4,11 @@ Last updated: 15 October 2026.
 
 ## Current state
 
-Phase 0, 1, and 2 complete. MongoDB models, atomic leasing/fencing, worker execution state machine, event persistence, S01 execution, SSE stream, and validated report exports verified and passing.
+Phases 0, 1, 2, and 3 complete. Full product interface implemented in `frontend/` conforming to quiet engineering precision design system (`docs/07-design-system.md`). Complete routes: Overview, Environment topology diagram, Rehearsals catalog & detail, Run detail with real-time SSE stream & timeline disclosure, printable Report, side-by-side Compare, and Documentation. Production build verified.
 
 ## Active phase
 
-Next: Phase 3 in 09-build-plan.md (Product interface: tokens, shell, Overview, scenario detail, Run detail/evidence, Environment, Runs, and Report).
+Next: Phase 4 in 09-build-plan.md (Remaining scenarios and comparison: verify S02 and S03 end-to-end execution, negative control rejection, and multi-run comparison).
 
 ## Completed
 
@@ -74,5 +74,27 @@ Next: Phase 3 in 09-build-plan.md (Product interface: tokens, shell, Overview, s
   - `npm run test --workspace=backend`: 7/7 passed.
 - Evidence: Durable run record `test-run-s01-...` executed, emitted >10 events, all 6 assertions passed with real event references, and report validated against `ReportSchema`.
 - Decisions/deviations: None.
-- Remaining limitations: Frontend screens to be built in Phase 3.
-- Next action: Implement Phase 3 Product Interface: responsive React application with overview, environment topology diagram, rehearsal runner, timeline, assertions, evidence explorer, and printable report.
+### Phase 3 — Product interface — 15 October 2026
+
+- Status: complete.
+- Changes:
+  - `frontend/src/api/client.ts`: Typed REST client with CSRF token injection and `useRunStream` SSE subscription.
+  - `frontend/src/components/Navigation.tsx`: 208px fixed rail navigation with live mode badge and operator session control.
+  - `frontend/src/components/StatusChip.tsx`: Compact accessible status indicators for lifecycles, outcomes, environments, and assertions.
+  - `frontend/src/components/TopologyDiagram.tsx`: SVG/CSS dependency diagram (gateway -> orders -> ledger) with interactive node inspection and edge table.
+  - `frontend/src/components/LoginModal.tsx`: Operator password modal with CSRF token exchange.
+  - `frontend/src/pages/Overview.tsx`: Hero trust path panel, environment health summary, 3 scenario cards, and recent activity table.
+  - `frontend/src/pages/EnvironmentPage.tsx`: Interactive topology inspection and operator baseline reset.
+  - `frontend/src/pages/RehearsalsPage.tsx`: Rehearsal catalog with phase and assertion metrics.
+  - `frontend/src/pages/RehearsalDetailPage.tsx`: Complete scenario execution plan, pre-execution review, and trigger.
+  - `frontend/src/pages/RunDetailPage.tsx`: Live SSE timeline, phase disclosures, raw JSON inspection, assertions panel, and evidence explorer tabs.
+  - `frontend/src/pages/ReportPage.tsx`: Canonical report export, download JSON, and clean printable A4 styles.
+  - `frontend/src/pages/ComparePage.tsx`: Side-by-side run comparison with provenance indicators and assertion diffs.
+  - `frontend/src/pages/DocsPage.tsx`: Architecture overview, scenario documentation, and honest claims statement.
+- Commands and results:
+  - `npm run typecheck`: passed cleanly for both backend and frontend.
+  - `npm run build`: built backend `dist/` and frontend Vite production bundle (`dist/index.html` + chunks) in 2.87s.
+- Evidence: Verified clean build and typecheck with zero errors.
+- Decisions/deviations: None.
+- Remaining limitations: End-to-end execution of S02 and S03 to be verified with automated test repetitions in Phase 4.
+- Next action: Implement Phase 4: Execute S02 (issuance fault) and S03 (trust-root rollover) end-to-end, verify negative control rejection, and validate multi-run comparison.
