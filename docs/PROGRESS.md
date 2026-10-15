@@ -4,11 +4,14 @@ Last updated: 15 October 2026.
 
 ## Current state
 
-Phases 0, 1, 2, and 3 complete. Full product interface implemented in `frontend/` conforming to quiet engineering precision design system (`docs/07-design-system.md`). Complete routes: Overview, Environment topology diagram, Rehearsals catalog & detail, Run detail with real-time SSE stream & timeline disclosure, printable Report, side-by-side Compare, and Documentation. Production build verified.
+Phases 0, 1, 2, 3, and 4 complete. All 3 scenarios (S01, S02, S03) executed with real cryptographic proofs and retained evidence:
+- S01: Renewal mismatch detection and context reload recovery.
+- S02: Controlled CA proxy partition, verified data plane authentication, and restored renewal.
+- S03: Negative control rejection under Root A trust, controlled dual-trust rollover, and baseline reset.
 
 ## Active phase
 
-Next: Phase 4 in 09-build-plan.md (Remaining scenarios and comparison: verify S02 and S03 end-to-end execution, negative control rejection, and multi-run comparison).
+Next: Phase 5 in 09-build-plan.md (Viewer mode and release hardening: export redacted runs, implement public read-only adapter, and security tests).
 
 ## Completed
 
@@ -96,5 +99,18 @@ Next: Phase 4 in 09-build-plan.md (Remaining scenarios and comparison: verify S0
   - `npm run build`: built backend `dist/` and frontend Vite production bundle (`dist/index.html` + chunks) in 2.87s.
 - Evidence: Verified clean build and typecheck with zero errors.
 - Decisions/deviations: None.
-- Remaining limitations: End-to-end execution of S02 and S03 to be verified with automated test repetitions in Phase 4.
-- Next action: Implement Phase 4: Execute S02 (issuance fault) and S03 (trust-root rollover) end-to-end, verify negative control rejection, and validate multi-run comparison.
+### Phase 4 — Remaining scenarios and comparison — 15 October 2026
+
+- Status: complete.
+- Changes:
+  - `backend/tests/integration/scenarios-s02-s03.test.ts`: Integration test executing S02 and S03 end-to-end with real TLS handshakes and assertions.
+  - S02 proven: 3 bounded renewal requests rejected during simulated CA partition, existing data plane verified valid across fresh TLS handshakes, proxy restored, renewal completed, context reloaded.
+  - S03 proven: Negative control strictly rejected abrupt Root B certificate under Root A trust, baseline restored, dual-trust expanded across gateway and orders, sequential leaf switch completed, trust pruned to Root B only, and safe baseline reset back to Root A.
+  - Consecutive clean runs verified across scenario repetitions.
+- Commands and results:
+  - `npx vitest run tests/integration/scenarios-s02-s03.test.ts`: 3/3 passed in 8.66s.
+  - `npm run test --workspace=backend`: 10/10 passed across all suites.
+- Evidence: Run records for S02 (`test-s02-...`) and S03 (`test-s03-...`) persisted in MongoDB with verified assertion outcomes.
+- Decisions/deviations: None.
+- Remaining limitations: Export of sanitized runs for public viewer mode to be generated in Phase 5.
+- Next action: Implement Phase 5: Viewer mode and release hardening with snapshot export, security verification (CSRF, mode denial, auth), and responsive review.
